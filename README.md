@@ -57,6 +57,62 @@ The script presents a menu with all available actions:
 6. Opens firewall ports if UFW is active
 7. Starts the service and waits for TLS certificate issuance
 
+## How It Works
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         DEVICE                               │
+│                                                              │
+│  ┌─────────┐    ┌──────────────────┐    ┌────────────────┐  │
+│  │  Apps    │───>│  TUN Interface   │───>│ hev-socks5-    │  │
+│  │ (Chrome, │    │  (VPN capture)   │    │ tunnel         │  │
+│  │  etc.)   │    └──────────────────┘    │ (tun2socks)    │  │
+│  └─────────┘                             └───────┬────────┘  │
+│                                                  │           │
+│                                          SOCKS5  │           │
+│                                                  v           │
+│                                          ┌───────────────┐   │
+│                                          │ SSH Tunnel    │   │
+│                                          │ SOCKS5 server │   │
+│                                          │ (port 1080)   │   │
+│                                          └───────┬───────┘   │
+│                                                  │           │
+│                                     SSH channels │           │
+│                                    (direct-tcpip)│           │
+│                                                  v           │
+│                                          ┌───────────────┐   │
+│                                          │  NaiveProxy   │   │
+│                                          │  SOCKS5 proxy │   │
+│                                          │  (port 1081)  │   │
+│                                          └───────┬───────┘   │
+│                                                  │           │
+└──────────────────────────────────────────────────┼───────────┘
+                                                   │
+                              HTTPS (looks like    │
+                              normal Chrome        │
+                              browsing to ISP)     │
+                                                   v
+┌──────────────────────────────────────────────────────────────┐
+│                         SERVER                               │
+│                                                              │
+│  ┌─────────────────┐     ┌──────────────┐     ┌──────────┐  │
+│  │  Caddy + forward│────>│  SSH Server  │────>│ Internet │  │
+│  │  proxy (443)    │     │  (port 22)   │     │          │  │
+│  │                 │     └──────────────┘     └──────────┘  │
+│  │  TLS termination│                                        │
+│  │  + decoy website│  <── probes see a normal website       │
+│  └─────────────────┘                                        │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**What the ISP/censor sees:** Your phone making a normal HTTPS connection to `your-domain.com:443` — identical to regular Chrome browsing. No VPN signatures.
+
+**What actually happens inside that HTTPS:**
+
+```
+App traffic → SOCKS5 → SSH tunnel → NaiveProxy → HTTPS CONNECT → Caddy → SSH → Internet
+```
+
 ## SlipNet App Configuration
 
 After setup completes, create a profile in the SlipNet app with these settings:
@@ -68,12 +124,19 @@ After setup completes, create a profile in the SlipNet app with these settings:
 | Server Port    | 443                            |
 | Proxy Username | *(shown after setup)*          |
 | Proxy Password | *(shown after setup)*          |
-| SSH Host       | 127.0.0.1                      |
 | SSH Port       | 22                             |
 | SSH Username   | your SSH user on the server    |
 | SSH Password   | your SSH password or key        |
 
-The NaiveProxy connection carries your SSH tunnel through an HTTPS connection that looks like normal web traffic to network observers.
+The NaiveProxy connection carries your SSH tunnel through an HTTPS connection that looks like normal web traffic to network observers. SSH Host defaults to the server domain automatically.
+
+### SNI Hostname (leave empty)
+
+The "SNI Hostname" field in the app is for **domain fronting** through a CDN (e.g. Cloudflare) — it replaces the domain in the TLS ClientHello so the censor sees a connection to an innocuous site instead of your server.
+
+**For this setup (direct Caddy, no CDN), leave it empty.** Your Caddy server only has a TLS certificate for your domain. If you set SNI to another domain (e.g. `google.com`), the TLS handshake will fail because the certificate doesn't match.
+
+NaiveProxy's traffic already looks like normal Chrome HTTPS browsing thanks to its Chromium network stack — SNI spoofing is not needed for censorship resistance with a direct connection.
 
 ## File Locations
 
