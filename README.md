@@ -136,6 +136,9 @@ For advanced users who want to customize the configuration:
 
 3. **Create Caddyfile** at `/etc/caddy-naive/Caddyfile`:
    ```
+   {
+       order forward_proxy before file_server
+   }
    :443, your-domain.com {
        tls your-email@example.com
        route {

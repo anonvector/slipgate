@@ -487,6 +487,9 @@ write_caddyfile() {
     mkdir -p /etc/caddy-naive
 
     cat > /etc/caddy-naive/Caddyfile <<CADDYEOF
+{
+    order forward_proxy before file_server
+}
 :443, ${DOMAIN} {
     tls ${EMAIL}
     route {
