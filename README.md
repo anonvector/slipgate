@@ -22,7 +22,7 @@ sudo bash setup.sh
 **Option 2 — One-liner:**
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/user/slipnet-server-setup/main/setup.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/anonvector/slipnet-server-setup/main/setup.sh)
 ```
 
 ## Menu
