@@ -23,7 +23,7 @@ trap cleanup ERR
 
 generate_password() {
     local length="${1:-24}"
-    tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${length}"
+    head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c "${length}"
 }
 
 check_root() {
