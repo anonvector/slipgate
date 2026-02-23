@@ -44,6 +44,11 @@ random_decoy() {
     echo "${sites[$((RANDOM % ${#sites[@]}))]}"
 }
 
+wait_for_enter() {
+    echo ""
+    read -rp "  Press Enter to continue..." _
+}
+
 check_root() {
     if [[ "${EUID}" -ne 0 ]]; then
         echo "Error: This script must be run as root."
@@ -223,10 +228,10 @@ show_menu() {
             echo ""
 
             case "${choice}" in
-                1) do_reconfigure ;;
-                2) do_show_config ;;
+                1) do_reconfigure; wait_for_enter ;;
+                2) do_show_config; wait_for_enter ;;
                 3) do_manage_users ;;
-                4) do_uninstall ;;
+                4) do_uninstall; wait_for_enter ;;
                 0) exit 0 ;;
                 *) echo "Invalid choice." ;;
             esac
@@ -238,7 +243,7 @@ show_menu() {
             echo ""
 
             case "${choice}" in
-                1) do_install ;;
+                1) do_install; wait_for_enter ;;
                 0) exit 0 ;;
                 *) echo "Invalid choice." ;;
             esac
@@ -775,7 +780,7 @@ list_users() {
     done < <(grep 'basic_auth' "${caddyfile}" 2>/dev/null || true)
 
     if [[ "${found}" == false ]]; then
-        printf "  │ %-18s │ %-24s │ %-8s │\n" "(none)" "" ""
+        echo "  │          No users configured yet.                     │"
     fi
 
     echo "  └────────────────────┴──────────────────────────┴──────────┘"
@@ -803,9 +808,9 @@ do_manage_users() {
         echo ""
 
         case "${uchoice}" in
-            1) add_user ;;
-            2) delete_user ;;
-            3) list_users ;;
+            1) add_user; wait_for_enter ;;
+            2) delete_user; wait_for_enter ;;
+            3) list_users; wait_for_enter ;;
             0) break ;;
             *) echo "  Invalid choice." ;;
         esac
