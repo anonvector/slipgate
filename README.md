@@ -7,7 +7,7 @@ Interactive setup script that configures a server for use with the SlipNet Andro
 - **OS**: Ubuntu 20.04+ or Debian 11+
 - **Domain**: A domain with a DNS A record pointed at your server's IP
 - **Ports**: 80 and 443 must be available (not used by Apache, Nginx, etc.)
-- **SSH**: An SSH server already running (the script does not configure SSH)
+- **SSH** *(optional)*: An SSH server already running — only needed if you enable SSH tunnel access for users
 
 ## Quick Start
 
@@ -36,16 +36,18 @@ The script presents a menu with all available actions:
   Status: not installed
 
   1) Install         Set up NaiveProxy server
-  2) Reconfigure     Change domain/credentials
-  3) Show config     Print current credentials
+  2) Reconfigure     Change domain/email/decoy
+  3) Show config     Print current configuration
   4) Uninstall       Remove everything
+  5) Manage users    Add/delete/list proxy+SSH users
   0) Exit
 ```
 
 - **Install** — prompts for domain, email, credentials, and decoy site, then builds and starts everything
-- **Reconfigure** — shows current values, lets you change any setting, restarts the service
-- **Show config** — prints current credentials and the matching SlipNet app profile settings
-- **Uninstall** — stops the service and removes all files (binary, config, systemd unit, UFW rules)
+- **Reconfigure** — shows current values, lets you change domain/email/decoy, restarts the service
+- **Show config** — prints current configuration and user list with SSH status
+- **Uninstall** — stops the service and removes all files (binary, config, systemd unit, SSH users, UFW rules)
+- **Manage users** — add, delete, or list proxy users (SSH access is optional per user)
 
 ## What It Does
 
@@ -53,9 +55,10 @@ The script presents a menu with all available actions:
 2. Installs dependencies (curl, git, Go 1.21+)
 3. Builds Caddy with the NaiveProxy forwardproxy plugin using xcaddy
 4. Creates a Caddyfile with TLS, forward proxy auth, and a decoy reverse proxy
-5. Creates and enables a `caddy-naive` systemd service
-6. Opens firewall ports if UFW is active
-7. Starts the service and waits for TLS certificate issuance
+5. Optionally creates an SSH tunnel user (default: **no** — proxy-only)
+6. Creates and enables a `caddy-naive` systemd service
+7. Opens firewall ports if UFW is active
+8. Starts the service and waits for TLS certificate issuance
 
 ## How It Works
 
@@ -124,11 +127,11 @@ After setup completes, create a profile in the SlipNet app with these settings:
 | Server Port    | 443                            |
 | Proxy Username | *(shown after setup)*          |
 | Proxy Password | *(shown after setup)*          |
-| SSH Port       | 22                             |
-| SSH Username   | your SSH user on the server    |
-| SSH Password   | your SSH password or key        |
+| SSH Port       | 22 *(only if SSH enabled)*     |
+| SSH Username   | *(only if SSH enabled)*        |
+| SSH Password   | *(only if SSH enabled)*        |
 
-The NaiveProxy connection carries your SSH tunnel through an HTTPS connection that looks like normal web traffic to network observers. SSH Host defaults to the server domain automatically.
+The NaiveProxy connection carries your SSH tunnel through an HTTPS connection that looks like normal web traffic to network observers. SSH tunnel access is **optional** — during install or when adding users, answer `y` to "Create SSH tunnel access?" to enable it. By default, users are proxy-only.
 
 ## File Locations
 
