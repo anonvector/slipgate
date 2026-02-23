@@ -29,17 +29,15 @@ generate_password() {
 random_decoy() {
     local sites=(
         "https://www.wikipedia.org"
-        "https://www.reuters.com"
-        "https://www.bbc.com"
-        "https://www.medium.com"
-        "https://www.theguardian.com"
         "https://www.npmjs.com"
         "https://www.python.org"
         "https://www.rust-lang.org"
         "https://www.docker.com"
         "https://www.mozilla.org"
-        "https://www.archive.org"
         "https://www.w3.org"
+        "https://www.kernel.org"
+        "https://www.apache.org"
+        "https://www.jquery.com"
     )
     echo "${sites[$((RANDOM % ${#sites[@]}))]}"
 }
