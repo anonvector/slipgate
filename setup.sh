@@ -160,8 +160,10 @@ SSHEOF
 rewrite_caddyfile_settings() {
     local domain="$1" email="$2" decoy="$3"
     local caddyfile="/etc/caddy-naive/Caddyfile"
-    local auth_lines
+    local auth_lines decoy_host
     auth_lines="$(grep '            basic_auth ' "${caddyfile}" 2>/dev/null)" || auth_lines=""
+    decoy_host="${decoy#https://}"
+    decoy_host="${decoy_host%%/*}"
 
     if [[ -z "${auth_lines}" ]]; then
         echo "Error: No users found in Caddyfile."
@@ -183,6 +185,7 @@ ${auth_lines}
         }
         reverse_proxy ${decoy} {
             header_up Host {upstream_hostport}
+            header_down Location //${decoy_host} //${domain}
         }
     }
 }
@@ -861,6 +864,9 @@ write_caddyfile() {
 
     mkdir -p /etc/caddy-naive
 
+    local DECOY_HOST="${DECOY_URL#https://}"
+    DECOY_HOST="${DECOY_HOST%%/*}"
+
     cat > /etc/caddy-naive/Caddyfile <<CADDYEOF
 {
     order forward_proxy before file_server
@@ -876,6 +882,7 @@ write_caddyfile() {
         }
         reverse_proxy ${DECOY_URL} {
             header_up Host {upstream_hostport}
+            header_down Location //${DECOY_HOST} //${DOMAIN}
         }
     }
 }
