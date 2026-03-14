@@ -107,13 +107,21 @@ func handleTunnelAdd(ctx *actions.Context) error {
 		}
 
 	case config.TransportNaive:
-		email, err := prompt.String("Email (for Let's Encrypt)", "")
-		if err != nil {
-			return err
+		email := ctx.GetArg("email")
+		if email == "" {
+			var err error
+			email, err = prompt.String("Email (for Let's Encrypt)", "")
+			if err != nil {
+				return err
+			}
 		}
-		decoyURL, err := prompt.String("Decoy URL", "https://www.wikipedia.org")
-		if err != nil {
-			return err
+		decoyURL := ctx.GetArg("decoy-url")
+		if decoyURL == "" {
+			var err error
+			decoyURL, err = prompt.String("Decoy URL", "https://www.wikipedia.org")
+			if err != nil {
+				return err
+			}
 		}
 		tunnel.Naive = &config.NaiveConfig{
 			Email:    email,

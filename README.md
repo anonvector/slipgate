@@ -68,39 +68,65 @@ slipgate config export          # Export configuration
 slipgate config import          # Import configuration
 ```
 
+### Non-Interactive Tunnel Creation
+
+All tunnel types can be created without interactive prompts, useful for scripting and automation:
+
+```bash
+# DNSTT tunnel
+sudo slipgate tunnel add \
+  --transport dnstt \
+  --backend socks \
+  --tag mydnstt \
+  --domain t.example.com
+
+# Slipstream tunnel
+sudo slipgate tunnel add \
+  --transport slipstream \
+  --backend ssh \
+  --tag myslip \
+  --domain s.example.com
+
+# NaiveProxy tunnel
+sudo slipgate tunnel add \
+  --transport naive \
+  --backend socks \
+  --tag myproxy \
+  --domain example.com \
+  --email admin@example.com \
+  --decoy-url https://www.wikipedia.org
+```
+
+If any required flag is omitted, slipgate falls back to an interactive prompt for that field.
+
 ## Architecture
 
 ```
-                        ┌─────────────────────────────────┐
-                        │           SERVER                 │
-                        │                                  │
-  DNS queries ─────────>│  ┌───────────────────────────┐   │
-  (port 53)             │  │      DNS Router            │   │
-                        │  │  single / multi mode       │   │
-                        │  └──┬──────┬──────┬───────────┘   │
-                        │     │      │      │               │
-                        │     v      v      v               │
-                        │  ┌─────┐┌─────┐┌───────────┐     │
-                        │  │DNSTT││Slip-││Slipstream │     │
-                        │  │     ││stream││           │     │
-                        │  └──┬──┘└──┬──┘└─────┬─────┘     │
-                        │     │      │         │            │
-                        │     v      v         v            │
-  HTTPS (port 443) ────>│  ┌──────────────────────────┐    │
-                        │  │   NaiveProxy (Caddy)      │    │
-                        │  │   + decoy website         │    │
-                        │  └────────────┬──────────────┘    │
-                        │               │                   │
-                        │               v                   │
-                        │  ┌──────────────────────────┐    │
-                        │  │  Backend                  │    │
-                        │  │  SOCKS5 (microsocks)      │    │
-                        │  │  or SSH forwarding        │    │
-                        │  └────────────┬──────────────┘    │
-                        │               │                   │
-                        │               v                   │
-                        │           Internet                │
-                        └─────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                           SERVER                              │
+│                                                               │
+│  DNS (port 53)                        HTTPS (port 443)        │
+│       │                                     │                 │
+│       v                                     v                 │
+│  ┌─────────────────────┐          ┌───────────────────────┐   │
+│  │     DNS Router       │          │   NaiveProxy (Caddy)  │   │
+│  │  single / multi mode │          │   + decoy website     │   │
+│  └──┬──────────┬────────┘          └──────────┬────────────┘   │
+│     │          │                              │               │
+│     v          v                              │               │
+│  ┌──────┐  ┌───────────┐                     │               │
+│  │DNSTT │  │Slipstream │                     │               │
+│  └──┬───┘  └─────┬─────┘                     │               │
+│     │            │                            │               │
+│     v            v                            v               │
+│  ┌────────────────────────────────────────────────────────┐   │
+│  │                    Backend                              │   │
+│  │           SOCKS5 (microsocks) or SSH                    │   │
+│  └────────────────────────┬───────────────────────────────┘   │
+│                           │                                   │
+│                           v                                   │
+│                       Internet                                │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Transport Types
