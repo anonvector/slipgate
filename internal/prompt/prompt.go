@@ -71,10 +71,11 @@ func Select(label string, options []actions.SelectOption) (string, error) {
 
 // MultiSelect asks user to select multiple options.
 func MultiSelect(label string, options []actions.SelectOption) ([]string, error) {
-	fmt.Printf("\n  %s (comma-separated numbers, or 'all'):\n", label)
+	fmt.Printf("\n  %s:\n", label)
 	for i, opt := range options {
 		fmt.Printf("    %d) %s\n", i+1, opt.Label)
 	}
+	fmt.Printf("    %d) All\n", len(options)+1)
 	fmt.Print("  Choice: ")
 
 	line, err := reader.ReadString('\n')
@@ -83,7 +84,8 @@ func MultiSelect(label string, options []actions.SelectOption) ([]string, error)
 	}
 	line = strings.TrimSpace(line)
 
-	if strings.EqualFold(line, "all") {
+	allIdx := fmt.Sprintf("%d", len(options)+1)
+	if strings.EqualFold(line, "all") || line == allIdx {
 		var result []string
 		for _, opt := range options {
 			result = append(result, opt.Value)
