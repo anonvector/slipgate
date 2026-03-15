@@ -115,16 +115,6 @@ func handleSystemInstall(ctx *actions.Context) error {
 	out.Print("  ── Tunnel Setup ────────────────────────────────────")
 	out.Print("")
 
-	setupTunnel, err := prompt.ConfirmYes("Set up tunnels now?")
-	if err != nil {
-		return err
-	}
-	if !setupTunnel {
-		out.Print("")
-		out.Info("Run 'sudo slipgate tunnel add' when you're ready.")
-		return nil
-	}
-
 	// Backend (shared across all transports)
 	backend, err := prompt.Select("Backend", actions.BackendOptions)
 	if err != nil {
