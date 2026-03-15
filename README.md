@@ -173,6 +173,10 @@ make test               # Run tests
 make release            # Build release binaries
 ```
 
+## Credits
+
+Built on top of [dnstm](https://github.com/net2share/dnstm) by [net2share](https://github.com/net2share).
+
 ## License
 
 AGPL-3.0
