@@ -36,5 +36,7 @@ func SetupMicrosocksWithAuth(user, password string) error {
 		return err
 	}
 
+	// Restart to pick up new ExecStart (e.g. after adding auth)
+	_ = service.Restart(unit.Name)
 	return service.Start(unit.Name)
 }

@@ -306,12 +306,6 @@ func handleSystemInstall(ctx *actions.Context) error {
 		}
 	}
 
-	if setupMicrosocks {
-		if err := proxy.SetupMicrosocks(); err != nil {
-			out.Warning("Failed to setup microsocks: " + err.Error())
-		}
-	}
-
 	// ── Step 6: Create first user ──────────────────────────────────
 	out.Print("")
 	out.Print("  ── User Setup ──────────────────────────────────────")
@@ -321,6 +315,10 @@ func handleSystemInstall(ctx *actions.Context) error {
 	if err != nil {
 		return err
 	}
+
+	microsocksUser := ""
+	microsocksPass := ""
+
 	if createUser {
 		username, err := prompt.String("Username", "user1")
 		if err != nil {
@@ -339,9 +337,8 @@ func handleSystemInstall(ctx *actions.Context) error {
 			return actions.NewError(actions.SystemInstall, "failed to create user", err)
 		}
 
-		if err := proxy.SetupMicrosocksWithAuth(username, password); err != nil {
-			out.Warning("Failed to update SOCKS proxy auth: " + err.Error())
-		}
+		microsocksUser = username
+		microsocksPass = password
 
 		cfg.AddUser(config.UserConfig{Username: username, Password: password})
 		if err := cfg.Save(); err != nil {
@@ -349,6 +346,19 @@ func handleSystemInstall(ctx *actions.Context) error {
 		}
 
 		out.Success(fmt.Sprintf("User %q created (SSH + SOCKS)", username))
+	}
+
+	// Setup microsocks AFTER user creation so auth is configured from the start
+	if setupMicrosocks {
+		if microsocksUser != "" {
+			if err := proxy.SetupMicrosocksWithAuth(microsocksUser, microsocksPass); err != nil {
+				out.Warning("Failed to setup microsocks: " + err.Error())
+			}
+		} else {
+			if err := proxy.SetupMicrosocks(); err != nil {
+				out.Warning("Failed to setup microsocks: " + err.Error())
+			}
+		}
 	}
 
 	// ── Step 7: Summary ────────────────────────────────────────────
