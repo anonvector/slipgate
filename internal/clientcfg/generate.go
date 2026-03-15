@@ -34,7 +34,7 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	fields[FDomain] = tunnel.Domain
 
 	// Defaults
-	fields[FResolvers] = ""
+	fields[FResolvers] = "8.8.8.8:53:0"
 	fields[FAuthMode] = "0"
 	fields[FKeepAlive] = "5000"
 	fields[FCongestionControl] = "bbr"
