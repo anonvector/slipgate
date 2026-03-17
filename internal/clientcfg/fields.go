@@ -81,12 +81,12 @@ var TunnelTypeMap = map[string]map[string]map[string]string{
 	},
 	config.TransportSSH: {
 		"": {
-			config.BackendSSH: "direct_ssh",
+			config.BackendSSH: "ssh",
 		},
 	},
 	config.TransportSOCKS: {
 		"": {
-			config.BackendSOCKS: "direct_socks",
+			config.BackendSOCKS: "socks5",
 		},
 	},
 }
