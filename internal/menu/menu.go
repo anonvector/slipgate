@@ -121,7 +121,7 @@ func tunnelMenu(cfg *config.Config) error {
 	fmt.Println("  ─────────────────")
 	fmt.Println("  1) Add tunnel(s)")
 	fmt.Println("  2) List / Status")
-	fmt.Println("  3) Edit tunnel (MTU)")
+	fmt.Println("  3) Edit tunnel")
 	fmt.Println("  4) Share tunnel")
 	fmt.Println("  5) Start tunnel")
 	fmt.Println("  6) Stop tunnel")

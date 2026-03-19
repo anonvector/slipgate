@@ -78,7 +78,12 @@ func init() {
 		Category: "tunnel",
 		Inputs: []InputField{
 			{Key: "tag", Label: "Tunnel tag", Required: true},
+			{Key: "domain", Label: "Domain"},
 			{Key: "mtu", Label: "MTU"},
+			{Key: "private-key", Label: "Private key (hex)"},
+			{Key: "public-key", Label: "Public key (hex)"},
+			{Key: "email", Label: "Email (Let's Encrypt)"},
+			{Key: "decoy-url", Label: "Decoy URL"},
 		},
 	})
 
