@@ -121,12 +121,13 @@ func tunnelMenu(cfg *config.Config) error {
 	fmt.Println("  ─────────────────")
 	fmt.Println("  1) Add tunnel(s)")
 	fmt.Println("  2) List / Status")
-	fmt.Println("  3) Share tunnel")
-	fmt.Println("  4) Start tunnel")
-	fmt.Println("  5) Stop tunnel")
-	fmt.Println("  6) View logs")
-	fmt.Println("  7) Remove tunnel")
-	fmt.Println("  8) Scan resolvers")
+	fmt.Println("  3) Edit tunnel (MTU)")
+	fmt.Println("  4) Share tunnel")
+	fmt.Println("  5) Start tunnel")
+	fmt.Println("  6) Stop tunnel")
+	fmt.Println("  7) View logs")
+	fmt.Println("  8) Remove tunnel")
+	fmt.Println("  9) Scan resolvers")
 	fmt.Println("  0) Back")
 	fmt.Print("\n  Choice: ")
 
@@ -144,22 +145,24 @@ func tunnelMenu(cfg *config.Config) error {
 		}
 		waitForEnter()
 	case "3":
+		return runAction(actions.TunnelEdit, cfg)
+	case "4":
 		if err := runAction(actions.TunnelShare, cfg); err != nil {
 			return err
 		}
 		waitForEnter()
-	case "4":
-		return runAction(actions.TunnelStart, cfg)
 	case "5":
-		return runAction(actions.TunnelStop, cfg)
+		return runAction(actions.TunnelStart, cfg)
 	case "6":
+		return runAction(actions.TunnelStop, cfg)
+	case "7":
 		if err := runAction(actions.TunnelLogs, cfg); err != nil {
 			return err
 		}
 		waitForEnter()
-	case "7":
-		return runAction(actions.TunnelRemove, cfg)
 	case "8":
+		return runAction(actions.TunnelRemove, cfg)
+	case "9":
 		if err := runAction(actions.TunnelScan, cfg); err != nil {
 			return err
 		}

@@ -73,6 +73,16 @@ func init() {
 	})
 
 	Register(&Action{
+		ID:       TunnelEdit,
+		Name:     "Edit Tunnel",
+		Category: "tunnel",
+		Inputs: []InputField{
+			{Key: "tag", Label: "Tunnel tag", Required: true},
+			{Key: "mtu", Label: "MTU"},
+		},
+	})
+
+	Register(&Action{
 		ID:       TunnelScan,
 		Name:     "Scan Resolvers",
 		Category: "tunnel",

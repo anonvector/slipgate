@@ -10,6 +10,7 @@ const (
 	TunnelShare  = "tunnel.share"
 	TunnelStatus = "tunnel.status"
 	TunnelLogs   = "tunnel.logs"
+	TunnelEdit   = "tunnel.edit"
 
 	// Router actions
 	RouterStatus = "router.status"

@@ -31,6 +31,7 @@ func init() {
 	register(actions.TunnelShare, handleTunnelShare)
 	register(actions.TunnelStatus, handleTunnelStatus)
 	register(actions.TunnelLogs, handleTunnelLogs)
+	register(actions.TunnelEdit, handleTunnelEdit)
 	register(actions.RouterStatus, handleRouterStatus)
 	register(actions.RouterMode, handleRouterMode)
 	register(actions.RouterSwitch, handleRouterSwitch)
