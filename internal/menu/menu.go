@@ -139,20 +139,28 @@ func tunnelMenu(cfg *config.Config) error {
 	case "1":
 		return runAction(actions.TunnelAdd, cfg)
 	case "2":
-		return runAction(actions.TunnelStatus, cfg)
+		if err := runAction(actions.TunnelStatus, cfg); err != nil {
+			return err
+		}
+		waitForEnter()
 	case "3":
-		return runAction(actions.TunnelShare, cfg)
+		if err := runAction(actions.TunnelShare, cfg); err != nil {
+			return err
+		}
+		waitForEnter()
 	case "4":
 		return runAction(actions.TunnelStart, cfg)
 	case "5":
 		return runAction(actions.TunnelStop, cfg)
 	case "6":
-		return runAction(actions.TunnelLogs, cfg)
+		if err := runAction(actions.TunnelLogs, cfg); err != nil {
+			return err
+		}
+		waitForEnter()
 	case "7":
 		return runAction(actions.TunnelRemove, cfg)
 	case "8":
-		err := runAction(actions.TunnelScan, cfg)
-		if err != nil {
+		if err := runAction(actions.TunnelScan, cfg); err != nil {
 			return err
 		}
 		waitForEnter()
