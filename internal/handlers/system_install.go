@@ -540,39 +540,46 @@ func handleSystemInstall(ctx *actions.Context) error {
 	out.Print("")
 
 	// Show slipnet:// configs
-	if len(cfg.Users) > 0 {
-		out.Print("    Client Configs:")
-		out.Print("")
-		for _, u := range cfg.Users {
-			for _, t := range allTunnels {
-				backendCfg := cfg.GetBackend(t.Backend)
-				if backendCfg == nil {
+	out.Print("    Client Configs:")
+	out.Print("")
+	users := cfg.Users
+	if len(users) == 0 {
+		// Show configs without credentials when no user was created
+		users = []config.UserConfig{{}}
+	}
+	for _, u := range users {
+		for _, t := range allTunnels {
+			backendCfg := cfg.GetBackend(t.Backend)
+			if backendCfg == nil {
+				continue
+			}
+
+			modes := []string{""}
+			if t.Transport == config.TransportDNSTT {
+				modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
+			}
+
+			for _, mode := range modes {
+				opts := clientcfg.URIOptions{
+					ClientMode: mode,
+					Username:   u.Username,
+					Password:   u.Password,
+				}
+				uri, err := clientcfg.GenerateURI(&t, backendCfg, cfg, opts)
+				if err != nil {
 					continue
 				}
-
-				modes := []string{""}
-				if t.Transport == config.TransportDNSTT {
-					modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
+				label := t.Tag
+				if mode == clientcfg.ClientModeNoizDNS {
+					label = strings.ReplaceAll(label, "dnstt", "noizdns")
 				}
-
-				for _, mode := range modes {
-					opts := clientcfg.URIOptions{
-						ClientMode: mode,
-						Username:   u.Username,
-						Password:   u.Password,
-					}
-					uri, err := clientcfg.GenerateURI(&t, backendCfg, cfg, opts)
-					if err != nil {
-						continue
-					}
-					label := t.Tag
-					if mode == clientcfg.ClientModeNoizDNS {
-						label = strings.ReplaceAll(label, "dnstt", "noizdns")
-					}
+				if u.Username != "" {
 					out.Print(fmt.Sprintf("    [%s] %s", label, u.Username))
-					out.Print(fmt.Sprintf("    %s", uri))
-					out.Print("")
+				} else {
+					out.Print(fmt.Sprintf("    [%s] (no auth)", label))
 				}
+				out.Print(fmt.Sprintf("    %s", uri))
+				out.Print("")
 			}
 		}
 	}
