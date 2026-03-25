@@ -323,6 +323,12 @@ func handleQuickWizard(ctx *actions.Context) error {
 		_ = cfg.Save()
 	}
 
+	// In single mode, free port 53 for direct binding
+	if cfg.Route.Mode != "multi" && dnsTunnelCount > 0 {
+		network.FreePort(53, "udp")
+		_ = dnsrouter.StopRouterService()
+	}
+
 	// Start tunnel services
 	for i := range allTunnels {
 		if allTunnels[i].IsDNSTunnel() && allTunnels[i].Port > 0 {
@@ -335,8 +341,8 @@ func handleQuickWizard(ctx *actions.Context) error {
 		out.Success(fmt.Sprintf("Tunnel %q running", allTunnels[i].Tag))
 	}
 
-	// Start DNS router if needed
-	if dnsTunnelCount > 0 {
+	// Multi mode only: start DNS router for domain-based routing
+	if cfg.Route.Mode == "multi" && dnsTunnelCount > 0 {
 		out.Info("Starting DNS router...")
 		if err := dnsrouter.CreateRouterService(); err != nil {
 			out.Warning("Failed to create DNS router: " + err.Error())

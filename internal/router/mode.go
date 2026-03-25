@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/anonvector/slipgate/internal/config"
+	"github.com/anonvector/slipgate/internal/dnsrouter"
 	"github.com/anonvector/slipgate/internal/service"
 )
 
@@ -22,7 +23,8 @@ func SwitchMode(cfg *config.Config, newMode string) error {
 }
 
 func switchToMulti(cfg *config.Config) error {
-	// Start all DNS tunnel services on their internal ports
+	// Restart all DNS tunnel services — they'll bind to internal ports (5310+)
+	// since config mode is now "multi"
 	for _, t := range cfg.Tunnels {
 		if t.IsDNSTunnel() && t.Enabled {
 			svcName := service.TunnelServiceName(t.Tag)
@@ -32,11 +34,14 @@ func switchToMulti(cfg *config.Config) error {
 		}
 	}
 
-	// Ensure the DNS router is running (forwards :53 → internal ports)
+	// Start DNS router to forward :53 → internal ports
 	return ensureRouterRunning()
 }
 
 func switchToSingle(cfg *config.Config) error {
+	// Stop DNS router — transport will bind directly to :53
+	_ = dnsrouter.StopRouterService()
+
 	// Stop all DNS tunnel services except the active one
 	for _, t := range cfg.Tunnels {
 		if t.IsDNSTunnel() && t.Enabled && t.Tag != cfg.Route.Active {
@@ -45,7 +50,8 @@ func switchToSingle(cfg *config.Config) error {
 		}
 	}
 
-	// Restart the active tunnel on its internal port
+	// Restart the active tunnel — it'll bind directly to :53
+	// since config mode is now "single"
 	if cfg.Route.Active != "" {
 		svcName := service.TunnelServiceName(cfg.Route.Active)
 		if err := service.Restart(svcName); err != nil {
@@ -53,6 +59,5 @@ func switchToSingle(cfg *config.Config) error {
 		}
 	}
 
-	// DNS router must stay running to forward :53 → internal ports
-	return ensureRouterRunning()
+	return nil
 }

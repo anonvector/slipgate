@@ -32,7 +32,14 @@ func buildDNSTTService(tunnel *config.TunnelConfig, cfg *config.Config) (*dnsttS
 	}
 
 	binPath := filepath.Join(config.DefaultBinDir, "dnstt-server")
-	listenAddr := fmt.Sprintf("0.0.0.0:%d", tunnel.Port)
+
+	// Single mode: bind directly to port 53 (no DNS router in the path).
+	// Multi mode: bind to internal port, DNS router forwards from 53.
+	port := tunnel.Port
+	if cfg.Route.Mode != "multi" {
+		port = 53
+	}
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", port)
 
 	mtu := tunnel.DNSTT.MTU
 	if mtu == 0 {

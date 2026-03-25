@@ -9,12 +9,16 @@ import (
 )
 
 // AddTunnel registers a tunnel with the routing layer.
-// DNS tunnels always use internal ports (5310+), so the DNS router must be
-// running to forward port 53 traffic regardless of single or multi mode.
-// If the router is already running, it is restarted to pick up new config.
+// In multi mode, the DNS router must be running to forward port 53 traffic.
+// In single mode, the transport binds directly to port 53 — no router needed.
 func AddTunnel(cfg *config.Config, tunnel *config.TunnelConfig) error {
 	if !tunnel.IsDNSTunnel() {
 		return nil // NaiveProxy doesn't need DNS routing
+	}
+
+	// Single mode: no DNS router needed
+	if cfg.Route.Mode != "multi" {
+		return nil
 	}
 
 	status, _ := service.Status("slipgate-dnsrouter")

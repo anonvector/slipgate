@@ -20,9 +20,19 @@ func buildSlipstreamExecStart(tunnel *config.TunnelConfig, cfg *config.Config) (
 
 	binPath := filepath.Join(config.DefaultBinDir, "slipstream-server")
 
-	return fmt.Sprintf("%s --dns-listen-host 127.0.0.1 --dns-listen-port %d --cert %s --key %s --domain %s --target-address %s",
+	// Single mode: bind directly to port 53 (no DNS router).
+	// Multi mode: bind to internal port, DNS router forwards from 53.
+	port := tunnel.Port
+	listenHost := "127.0.0.1"
+	if cfg.Route.Mode != "multi" {
+		port = 53
+		listenHost = "0.0.0.0"
+	}
+
+	return fmt.Sprintf("%s --dns-listen-host %s --dns-listen-port %d --cert %s --key %s --domain %s --target-address %s",
 		binPath,
-		tunnel.Port,
+		listenHost,
+		port,
 		tunnel.Slipstream.Cert,
 		tunnel.Slipstream.Key,
 		tunnel.Domain,
