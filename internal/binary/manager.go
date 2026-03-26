@@ -24,23 +24,25 @@ const releaseBaseURL = "https://github.com/anonvector/slipgate/releases"
 // directory instead of downloading. Used for SCP/offline installs.
 var OfflineDir string
 
-// DownloadBase returns the base URL for binary downloads.
-// When version.ReleaseTag is set (dev builds), assets are fetched from
-// that specific tag; otherwise from the latest stable release.
+const stableDownloadBase = releaseBaseURL + "/latest/download"
+
+// DownloadBase returns the base URL for slipgate binary downloads.
+// Dev builds use their tagged release; stable builds use latest.
 func DownloadBase() string {
 	if version.ReleaseTag != "" {
 		return releaseBaseURL + "/download/" + version.ReleaseTag
 	}
-	return releaseBaseURL + "/latest/download"
+	return stableDownloadBase
 }
 
-// binaryURLs returns download URL templates for each transport binary.
+// binaryURLTemplates returns download URL templates for transport binaries.
+// Transport binaries always come from the latest stable release regardless
+// of dev/stable channel — they are not included in dev pre-releases.
 func binaryURLTemplates() map[string]string {
-	base := DownloadBase()
 	return map[string]string{
-		"dnstt-server":      base + "/dnstt-server-%s-%s",
-		"slipstream-server": base + "/slipstream-server-%s-%s",
-		"caddy-naive":       base + "/caddy-naive-%s-%s",
+		"dnstt-server":      stableDownloadBase + "/dnstt-server-%s-%s",
+		"slipstream-server": stableDownloadBase + "/slipstream-server-%s-%s",
+		"caddy-naive":       stableDownloadBase + "/caddy-naive-%s-%s",
 	}
 }
 
