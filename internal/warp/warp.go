@@ -168,10 +168,10 @@ func generateWgConf(cfg *config.Config) error {
 
 	uids := collectUserUIDs(cfg)
 
+	// wg-quick with Table=200 and AllowedIPs=0.0.0.0/0 already adds the
+	// default route to table 200.  PostUp/PostDown only need ip-rule entries
+	// to steer specific UIDs into that table.
 	var postUp, postDown []string
-	postUp = append(postUp, fmt.Sprintf("ip route add default dev %%i table %d", RouteTable))
-	postDown = append(postDown, fmt.Sprintf("ip route del default dev %%i table %d", RouteTable))
-
 	for _, uid := range uids {
 		postUp = append(postUp, fmt.Sprintf("ip rule add uidrange %d-%d table %d", uid, uid, RouteTable))
 		postDown = append(postDown, fmt.Sprintf("ip rule del uidrange %d-%d table %d", uid, uid, RouteTable))
