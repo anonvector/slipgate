@@ -71,6 +71,7 @@ slipgate                        # Interactive TUI menu
 slipgate install                # Install dependencies and configure server
 slipgate uninstall              # Remove all services, configs, and binaries
 slipgate update                 # Self-update and restart all services
+slipgate restart                # Restart all services (DNS router, tunnels, SOCKS)
 slipgate users                  # Manage SSH/SOCKS users and view configs
 
 # Tunnel management
