@@ -57,6 +57,11 @@ func Run(cfg *config.Config, cfgErr error) error {
 				printError(err)
 			}
 			waitForEnter()
+		case "stats":
+			if err := runAction(actions.SystemStats, cfg); err != nil {
+				printError(err)
+			}
+			waitForEnter()
 		case "warp":
 			if err := runAction(actions.WarpToggle, cfg); err != nil {
 				printError(err)
@@ -97,10 +102,11 @@ func showMainMenu() (string, error) {
 	fmt.Println("  1) Quick Wizard")
 	fmt.Println("  2) Tunnels")
 	fmt.Println("  3) Users")
-	fmt.Println("  4) WARP")
-	fmt.Println("  5) Install (advanced)")
-	fmt.Println("  6) Update")
-	fmt.Println("  7) Uninstall")
+	fmt.Println("  4) Stats")
+	fmt.Println("  5) WARP")
+	fmt.Println("  6) Install (advanced)")
+	fmt.Println("  7) Update")
+	fmt.Println("  8) Uninstall")
 	fmt.Println("  0) Quit")
 	fmt.Print("\n  Choice: ")
 
@@ -116,13 +122,15 @@ func showMainMenu() (string, error) {
 		return "tunnels", nil
 	case "3", "users":
 		return "users", nil
-	case "4", "warp":
+	case "4", "stats":
+		return "stats", nil
+	case "5", "warp":
 		return "warp", nil
-	case "5", "install":
+	case "6", "install":
 		return "install", nil
-	case "6", "update":
+	case "7", "update":
 		return "update", nil
-	case "7", "uninstall":
+	case "8", "uninstall":
 		return "uninstall", nil
 	case "0", "q", "quit", "exit":
 		return "quit", nil

@@ -40,6 +40,12 @@ func init() {
 	})
 
 	Register(&Action{
+		ID:       SystemStats,
+		Name:     "Stats",
+		Category: "system",
+	})
+
+	Register(&Action{
 		ID:       QuickWizard,
 		Name:     "Quick Wizard",
 		Category: "system",
