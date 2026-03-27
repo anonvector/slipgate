@@ -33,6 +33,8 @@ func Create(u *Unit) error {
 	content := fmt.Sprintf(`[Unit]
 Description=%s
 After=%s
+StartLimitIntervalSec=300
+StartLimitBurst=15
 
 [Service]
 Type=simple
@@ -41,6 +43,8 @@ Group=%s
 ExecStart=%s
 Restart=%s
 RestartSec=5
+LogRateLimitIntervalSec=30
+LogRateLimitBurst=100
 `, u.Description, u.After, u.User, u.Group, u.ExecStart, u.Restart)
 
 	if u.WorkingDir != "" {

@@ -25,7 +25,7 @@ func handleSystemRestart(ctx *actions.Context) error {
 		}
 	}
 
-	// 1. Restart SOCKS5 backend first (tunnels forward to it)
+	// 1. Restart SOCKS5 backend first (ready for tunnels when they come back)
 	if service.Exists("slipgate-socks5") {
 		if err := service.Restart("slipgate-socks5"); err != nil {
 			out.Warning(fmt.Sprintf("Failed to restart slipgate-socks5: %v", err))
@@ -34,7 +34,7 @@ func handleSystemRestart(ctx *actions.Context) error {
 		}
 	}
 
-	// 2. Restart tunnel services (connect clients to backends)
+	// 2. Restart tunnel services (socks5 is already fresh)
 	for _, t := range cfg.Tunnels {
 		if t.IsDirectTransport() {
 			continue
@@ -49,7 +49,9 @@ func handleSystemRestart(ctx *actions.Context) error {
 		}
 	}
 
-	// 3. Restart DNS router last (routes to tunnels, needs them up)
+	// 3. Restart DNS router last — it holds persistent UDP connections to tunnel
+	// backends (cached in getBackend), so it must restart after tunnels to get
+	// fresh connections to the new tunnel processes.
 	if service.Exists("slipgate-dnsrouter") {
 		if err := service.Restart("slipgate-dnsrouter"); err != nil {
 			out.Warning(fmt.Sprintf("Failed to restart slipgate-dnsrouter: %v", err))

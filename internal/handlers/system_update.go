@@ -122,18 +122,16 @@ func handleSystemUpdate(ctx *actions.Context) error {
 			break
 		}
 	}
-	// Restart infrastructure services first (DNS router needs port 53 before tunnels)
-	for _, svc := range []string{"slipgate-dnsrouter", "slipgate-socks5"} {
-		if service.Exists(svc) {
-			if err := service.Restart(svc); err != nil {
-				out.Warning(fmt.Sprintf("Failed to restart %s: %v", svc, err))
-			} else {
-				out.Success(fmt.Sprintf("  %s restarted", svc))
-			}
+	// Restart socks5 first (ready for tunnels when they come back)
+	if service.Exists("slipgate-socks5") {
+		if err := service.Restart("slipgate-socks5"); err != nil {
+			out.Warning(fmt.Sprintf("Failed to restart slipgate-socks5: %v", err))
+		} else {
+			out.Success(fmt.Sprintf("  slipgate-socks5 restarted"))
 		}
 	}
 
-	// Then regenerate and restart tunnel services
+	// Regenerate and restart tunnel services (socks5 is already fresh)
 	for i := range cfg.Tunnels {
 		t := &cfg.Tunnels[i]
 		if t.IsDirectTransport() {
@@ -153,6 +151,16 @@ func handleSystemUpdate(ctx *actions.Context) error {
 			out.Success(fmt.Sprintf("  %s regenerated and restarted", svcName))
 		} else {
 			out.Success(fmt.Sprintf("  %s regenerated", svcName))
+		}
+	}
+
+	// Restart dnsrouter last — it holds persistent UDP connections to tunnel
+	// backends, so it must restart after tunnels to get fresh connections.
+	if service.Exists("slipgate-dnsrouter") {
+		if err := service.Restart("slipgate-dnsrouter"); err != nil {
+			out.Warning(fmt.Sprintf("Failed to restart slipgate-dnsrouter: %v", err))
+		} else {
+			out.Success(fmt.Sprintf("  slipgate-dnsrouter restarted"))
 		}
 	}
 
