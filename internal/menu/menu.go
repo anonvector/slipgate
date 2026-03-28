@@ -60,8 +60,8 @@ func Run(cfg *config.Config, cfgErr error) error {
 		case "stats":
 			if err := runAction(actions.SystemStats, cfg); err != nil {
 				printError(err)
+				waitForEnter()
 			}
-			waitForEnter()
 		case "warp":
 			if err := runAction(actions.WarpToggle, cfg); err != nil {
 				printError(err)
