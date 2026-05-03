@@ -302,6 +302,7 @@ func handleSystemDiag(ctx *actions.Context) error {
 		"slipgate-dnsrouter": true,
 		"slipgate-socks5":    true,
 		"slipgate-warp":      true,
+		"slipgate-iptables":  true,
 	}
 	for _, t := range cfg.Tunnels {
 		knownSvc[service.TunnelServiceName(t.Tag)] = true
