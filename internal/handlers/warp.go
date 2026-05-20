@@ -24,7 +24,13 @@ func handleWarp(ctx *actions.Context) error {
 			return nil
 		}
 
-		out.Info("Setting up Cloudflare WARP...")
+		warpIPv6, err := prompt.Confirm("Route IPv6 through WARP? (No = IPv4 only, safer on most VPS)")
+		if err != nil {
+			return err
+		}
+		cfg.Warp.IPv6 = warpIPv6
+
+		out.Info(fmt.Sprintf("Setting up Cloudflare WARP (%s)...", map[bool]string{true: "IPv4+IPv6", false: "IPv4 only"}[cfg.Warp.IPv6]))
 		if err := warp.Setup(cfg, func(msg string) { out.Info(msg) }); err != nil {
 			return actions.NewError(actions.WarpToggle, "WARP setup failed", err)
 		}
@@ -44,15 +50,20 @@ func handleWarp(ctx *actions.Context) error {
 	}
 
 	// Already set up — show status and offer toggle
+	ipv6Label := "IPv4 only"
+	if cfg.Warp.IPv6 {
+		ipv6Label = "IPv4+IPv6"
+	}
 	if warp.IsRunning() {
-		out.Info("WARP is currently ENABLED (active)")
+		out.Info(fmt.Sprintf("WARP is currently ENABLED (active, %s)", ipv6Label))
 	} else {
-		out.Info("WARP is currently DISABLED (inactive)")
+		out.Info(fmt.Sprintf("WARP is currently DISABLED (inactive, %s)", ipv6Label))
 	}
 
 	action, err := prompt.Select("Action", []actions.SelectOption{
 		{Value: "enable", Label: "Enable WARP"},
 		{Value: "disable", Label: "Disable WARP"},
+		{Value: "ipv6", Label: fmt.Sprintf("Change IPv6 routing (currently: %s)", ipv6Label)},
 		{Value: "cancel", Label: "Cancel"},
 	})
 	if err != nil {
@@ -84,6 +95,32 @@ func handleWarp(ctx *actions.Context) error {
 		}
 		recreateProxies(cfg, false, out)
 		out.Success("WARP disabled")
+
+	case "ipv6":
+		warpIPv6, err := prompt.Confirm("Route IPv6 through WARP? (No = IPv4 only, safer on most VPS)")
+		if err != nil {
+			return err
+		}
+		cfg.Warp.IPv6 = warpIPv6
+		if err := cfg.Save(); err != nil {
+			out.Warning("Failed to save config: " + err.Error())
+		}
+		// Regenerate wg0.conf with updated AllowedIPs and restart if running
+		if err := warp.RefreshRouting(cfg); err != nil {
+			out.Warning("Failed to refresh routing config: " + err.Error())
+		}
+		if warp.IsRunning() {
+			if err := warp.Disable(); err != nil {
+				out.Warning("Failed to stop WARP for restart: " + err.Error())
+			}
+			if err := warp.Enable(); err != nil {
+				out.Warning("Failed to restart WARP: " + err.Error())
+			} else {
+				out.Success(fmt.Sprintf("WARP restarted with %s", map[bool]string{true: "IPv4+IPv6", false: "IPv4 only"}[cfg.Warp.IPv6]))
+			}
+		} else {
+			out.Success(fmt.Sprintf("IPv6 routing set to: %s (takes effect on next WARP enable)", map[bool]string{true: "IPv4+IPv6", false: "IPv4 only"}[cfg.Warp.IPv6]))
+		}
 	}
 
 	return nil

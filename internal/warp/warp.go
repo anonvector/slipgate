@@ -411,6 +411,7 @@ func generateWgConf(cfg *config.Config) error {
 	}
 
 	uids := collectUserUIDs(cfg)
+	ipv6 := cfg.Warp.IPv6
 
 	// wg-quick with Table=200 and AllowedIPs=0.0.0.0/0 already adds the
 	// default route to table 200.  PostUp/PostDown only need ip-rule entries
@@ -424,6 +425,9 @@ func generateWgConf(cfg *config.Config) error {
 	// entirely — the rule is also backfilled live by ensurePublicAddrRules
 	// so a silent PostUp failure is recoverable.
 	for _, e := range detectPublicAddrs() {
+		if !ipv6 && e.family == "-6" {
+			continue
+		}
 		postUp = append(postUp, fmt.Sprintf("ip %s rule add from %s lookup main pref %d || true",
 			e.family, e.addr, PublicAddrRulePref))
 		postDown = append(postDown, fmt.Sprintf("ip %s rule del from %s lookup main pref %d || true",
@@ -439,6 +443,10 @@ func generateWgConf(cfg *config.Config) error {
 	conf.WriteString("[Interface]\n")
 	conf.WriteString(fmt.Sprintf("PrivateKey = %s\n", account.PrivateKey))
 	for _, addr := range account.Addresses {
+		// In IPv4-only mode skip WARP's IPv6 interface address (contains ':').
+		if !ipv6 && strings.Contains(addr, ":") {
+			continue
+		}
 		conf.WriteString(fmt.Sprintf("Address = %s\n", addr))
 	}
 	conf.WriteString("MTU = 1280\n")
@@ -453,7 +461,11 @@ func generateWgConf(cfg *config.Config) error {
 	conf.WriteString("\n[Peer]\n")
 	conf.WriteString(fmt.Sprintf("PublicKey = %s\n", account.PeerKey))
 	conf.WriteString(fmt.Sprintf("Endpoint = %s\n", account.Endpoint))
-	conf.WriteString("AllowedIPs = 0.0.0.0/0, ::/0\n")
+	if ipv6 {
+		conf.WriteString("AllowedIPs = 0.0.0.0/0, ::/0\n")
+	} else {
+		conf.WriteString("AllowedIPs = 0.0.0.0/0\n")
+	}
 	conf.WriteString("PersistentKeepalive = 25\n")
 
 	return os.WriteFile(WarpConf, []byte(conf.String()), 0600)

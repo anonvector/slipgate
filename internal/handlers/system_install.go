@@ -636,6 +636,16 @@ func handleSystemInstall(ctx *actions.Context) error {
 		if err != nil {
 			return err
 		}
+		if enableWarp {
+			// Ask IPv6 preference on first setup. Default is IPv4-only because
+			// many VPS providers have unstable IPv6 routing that breaks DNS
+			// tunnels when ::/0 is routed through WARP.
+			warpIPv6, err := prompt.Confirm("Route IPv6 through WARP? (No = IPv4 only, safer on most VPS)")
+			if err != nil {
+				return err
+			}
+			cfg.Warp.IPv6 = warpIPv6
+		}
 	}
 	if enableWarp {
 		// warp.Setup is idempotent — every step either check-and-skips
@@ -651,7 +661,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 		if cfg.Warp.Enabled {
 			action = "Refreshing"
 		}
-		out.Info(fmt.Sprintf("%s Cloudflare WARP...", action))
+		out.Info(fmt.Sprintf("%s Cloudflare WARP (%s)...", action, map[bool]string{true: "IPv4+IPv6", false: "IPv4 only"}[cfg.Warp.IPv6]))
 		if err := warp.Setup(cfg, func(msg string) { out.Info(msg) }); err != nil {
 			out.Warning("WARP setup failed: " + err.Error())
 		} else if !cfg.Warp.Enabled {

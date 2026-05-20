@@ -21,6 +21,10 @@ const (
 // WarpConfig tracks Cloudflare WARP outbound state.
 type WarpConfig struct {
 	Enabled bool `json:"enabled"`
+	// IPv6 controls whether WARP routes IPv6 traffic. Default false (IPv4 only)
+	// because many VPS providers have flaky or mis-configured IPv6, and routing
+	// ::/0 through WARP can break DNS tunnels and outbound connectivity.
+	IPv6 bool `json:"ipv6,omitempty"`
 }
 
 // Config is the top-level slipgate configuration.
