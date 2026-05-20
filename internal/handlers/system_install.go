@@ -175,6 +175,12 @@ func handleSystemInstall(ctx *actions.Context) error {
 		}
 	}
 
+	// Discard any keystrokes typed during the binary download / firewall steps
+	// above. Without this, input buffered in the TTY silently answers the
+	// backend and domain prompts that follow, leaving the user stuck at a
+	// later prompt they cannot see.
+	prompt.FlushStdin()
+
 	backend := ""
 	var backends []string
 	if needsBackend {
