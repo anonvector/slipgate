@@ -30,6 +30,14 @@ func clearRaw() {
 }
 
 func init() {
+	// Ignore SIGTTOU and SIGTTIN so the process is never stopped by background
+	// terminal-I/O signals. sudo's use_pty (default on Ubuntu 22.04+) creates a
+	// new session for the child and may not promote it to the terminal's foreground
+	// process group before it performs terminal control operations (tcsetattr,
+	// tcflush). Without this, the process silently enters T (stopped) state before
+	// printing a single character.
+	signal.Ignore(syscall.SIGTTOU, syscall.SIGTTIN)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
