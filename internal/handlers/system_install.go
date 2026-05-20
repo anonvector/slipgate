@@ -36,6 +36,11 @@ func handleSystemInstall(ctx *actions.Context) error {
 		out.Info(fmt.Sprintf("Offline mode: using binaries from %s", binDir))
 	}
 
+	// Discard any characters typed before slipgate started (e.g. during the
+	// binary download in install.sh). Without this, those buffered keystrokes
+	// silently answer the first prompt before the user can see it.
+	prompt.FlushStdin()
+
 	// ═══════════════════════════════════════════════════════════════
 	// PHASE 1 — All interactive prompts, no slow operations.
 	//

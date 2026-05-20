@@ -3,9 +3,46 @@ package prompt
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
 	"golang.org/x/term"
 )
+
+// rawMu guards the saved terminal state so the SIGINT handler can restore it.
+var (
+	rawMu    sync.Mutex
+	rawFD    = -1
+	rawState *term.State
+)
+
+func setRaw(fd int, state *term.State) {
+	rawMu.Lock()
+	rawFD, rawState = fd, state
+	rawMu.Unlock()
+}
+
+func clearRaw() {
+	rawMu.Lock()
+	rawFD, rawState = -1, nil
+	rawMu.Unlock()
+}
+
+func init() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-c
+		rawMu.Lock()
+		fd, state := rawFD, rawState
+		rawMu.Unlock()
+		if state != nil && fd >= 0 {
+			term.Restore(fd, state)
+		}
+		os.Exit(130)
+	}()
+}
 
 // readLine reads a line with arrow keys, home/end, delete, backspace support.
 // prompt is printed first and used to calculate redraw positions.
@@ -22,7 +59,11 @@ func readLine(prompt string) (string, error) {
 		fmt.Print(prompt)
 		return readSimple()
 	}
-	defer term.Restore(fd, oldState)
+	setRaw(fd, oldState)
+	defer func() {
+		clearRaw()
+		term.Restore(fd, oldState)
+	}()
 
 	// Print prompt
 	writeStr(prompt)
@@ -95,6 +136,21 @@ func readLine(prompt string) (string, error) {
 				readByte() // consume ~
 				pos = len(buf)
 				setCursorCol(len(prompt) + len(buf) + 1)
+			default:
+				// Consume the remainder of any unrecognised CSI sequence
+				// (e.g. Kitty keyboard protocol "\x1b[99;1u" for Ctrl+C).
+				// CSI parameter bytes are 0x30-0x3F; the final byte is 0x40-0x7E.
+				if seq1 < 0x40 {
+					for {
+						b, err := readByte()
+						if err != nil {
+							return "", err
+						}
+						if b >= 0x40 && b <= 0x7E {
+							break
+						}
+					}
+				}
 			}
 
 		case 1: // Ctrl-A (Home)
@@ -152,6 +208,13 @@ func writeStr(s string) {
 
 func readByte() (byte, error) {
 	var b [1]byte
-	_, err := os.Stdin.Read(b[:])
-	return b[0], err
+	for {
+		n, err := os.Stdin.Read(b[:])
+		if err != nil {
+			return 0, err
+		}
+		if n > 0 {
+			return b[0], nil
+		}
+	}
 }
