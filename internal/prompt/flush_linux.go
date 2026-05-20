@@ -15,6 +15,9 @@ import (
 func FlushStdin() {
 	fd := int(os.Stdin.Fd())
 
+	// Claim foreground before touching the terminal (see claimTerminalForeground).
+	claimTerminalForeground(fd)
+
 	// Save current file-status flags.
 	flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFL, 0)
 	if err != nil {

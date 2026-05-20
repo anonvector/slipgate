@@ -62,6 +62,11 @@ func readLine(prompt string) (string, error) {
 		return readSimple()
 	}
 
+	// Claim the terminal foreground before any attribute changes.
+	// Under sudo use_pty the child may not be promoted yet; with SIGTTOU
+	// ignored this always succeeds (see claimTerminalForeground).
+	claimTerminalForeground(fd)
+
 	oldState, err := term.MakeRaw(fd)
 	if err != nil {
 		fmt.Print(prompt)
