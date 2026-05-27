@@ -6,7 +6,8 @@ import (
 	"net"
 	"strings"
 	"time"
-
+	"os"
+	
 	"github.com/anonvector/slipgate/internal/config"
 )
 
@@ -203,11 +204,17 @@ func durationToSeconds(d string) string {
 }
 
 func getServerIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return ""
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String()
+// Check if a custom host override exists in the system environment variables first
+    if envIP := os.Getenv("SLIPGATE_HOST"); envIP != "" {
+        return envIP
+    }
+
+    // Default fallback logic for normal servers
+    conn, err := net.Dial("udp", "8.8.8.8:80")
+    if err != nil {
+        return ""
+    }
+    defer conn.Close()
+    localAddr := conn.LocalAddr().(*net.UDPAddr)
+    return localAddr.IP.String()
 }
