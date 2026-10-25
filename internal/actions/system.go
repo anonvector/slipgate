@@ -66,6 +66,25 @@ func init() {
 	})
 
 	Register(&Action{
+		ID:       SystemBackup,
+		Name:     "Backup (config, keys, users)",
+		Category: "system",
+		Inputs: []InputField{
+			{Key: "file", Label: `File to write the backup to ("-" for stdout)`, CLIOnly: true},
+		},
+	})
+
+	Register(&Action{
+		ID:       SystemRestore,
+		Name:     "Restore from backup",
+		Category: "system",
+		Inputs: []InputField{
+			{Key: "file", Label: `Backup file to restore ("-" for stdin)`, CLIOnly: true},
+			{Key: "yes", Label: "Restore without asking for confirmation", CLIOnly: true, Bool: true},
+		},
+	})
+
+	Register(&Action{
 		ID:       QuickWizard,
 		Name:     "Quick Wizard",
 		Category: "system",

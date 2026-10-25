@@ -161,10 +161,14 @@ func runPostUpdate(ctx *actions.Context) error {
 	cfg := ctx.Config.(*config.Config)
 
 	// Ensure port 53 is available (OS updates can re-enable systemd-resolved stub)
+	// and open 53/tcp, which the DNS router serves since TCP forwarding was added.
 	for _, t := range cfg.Tunnels {
 		if t.IsDNSTunnel() {
 			if err := network.DisableResolvedStub(); err != nil {
 				out.Warning("Failed to disable systemd-resolved stub: " + err.Error())
+			}
+			if err := network.AllowPort(53, "tcp"); err != nil {
+				out.Warning("Failed to open port 53/tcp: " + err.Error())
 			}
 			break
 		}

@@ -85,6 +85,11 @@ func Run(cfg *config.Config, cfgErr error) error {
 				fmt.Println("\n  Restart slipgate to use the new version.")
 				return nil
 			}
+		case "backup":
+			if err := backupMenu(cfg); err != nil {
+				printError(err)
+			}
+			waitForEnter()
 		case "uninstall":
 			if err := runAction(actions.SystemUninstall, cfg); err != nil {
 				printError(err)
@@ -113,6 +118,7 @@ func showMainMenu() (string, error) {
 	fmt.Println("  7) Install (advanced)")
 	fmt.Println("  8) Update")
 	fmt.Println("  9) Uninstall")
+	fmt.Println(" 10) Backup / Restore")
 	fmt.Println("  0) Quit")
 	fmt.Print("\n  Choice: ")
 
@@ -140,11 +146,24 @@ func showMainMenu() (string, error) {
 		return "update", nil
 	case "9", "uninstall":
 		return "uninstall", nil
+	case "10", "backup", "restore":
+		return "backup", nil
 	case "0", "q", "quit", "exit":
 		return "quit", nil
 	default:
 		return "", nil
 	}
+}
+
+func backupMenu(cfg *config.Config) error {
+	id, err := prompt.Select("Backup / Restore", []actions.SelectOption{
+		{Value: actions.SystemBackup, Label: "Back up this server (config, keys, users)"},
+		{Value: actions.SystemRestore, Label: "Restore a backup onto this server"},
+	})
+	if err != nil {
+		return err
+	}
+	return runAction(id, cfg)
 }
 
 func tunnelMenu(cfg *config.Config) error {

@@ -272,6 +272,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 		switch s.transport {
 		case config.TransportDNSTT, config.TransportSlipstream, config.TransportVayDNS:
 			_ = network.AllowPort(53, "udp")
+			_ = network.AllowPort(53, "tcp")
 			_ = network.DisableResolvedStub()
 		case config.TransportNaive:
 			_ = network.AllowPort(80, "tcp")

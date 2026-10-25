@@ -26,6 +26,8 @@ const (
 	SystemStats     = "system.stats"
 	SystemDiag      = "system.diag"
 	SystemMTU       = "system.mtu"
+	SystemBackup    = "system.backup"
+	SystemRestore   = "system.restore"
 	QuickWizard     = "system.wizard"
 
 	// WARP actions

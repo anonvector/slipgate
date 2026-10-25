@@ -78,6 +78,9 @@ func handleTunnelEdit(ctx *actions.Context) error {
 		if tunnel.VayDNS != nil {
 			tunnel.VayDNS.PrivateKey = filepath.Join(newDir, "server.key")
 		}
+		if tunnel.Soar != nil {
+			tunnel.Soar.PrivateKey = filepath.Join(newDir, "server.key")
+		}
 
 		// Stop old systemd service
 		oldSvcName := service.TunnelServiceName(tag)
@@ -299,6 +302,49 @@ func handleTunnelEdit(ctx *actions.Context) error {
 				tunnel.VayDNS.QueueSize = newQS
 				changed = true
 				out.Success(fmt.Sprintf("Queue size set to %d", newQS))
+			}
+		}
+
+	case config.TransportSoar:
+		if tunnel.Soar != nil {
+			// Private key
+			privKeyB64 := ctx.GetArg("private-key")
+			if privKeyB64 == "" {
+				var err error
+				privKeyB64, err = prompt.String("Private key (base64, blank to keep)", "")
+				if err != nil {
+					return err
+				}
+			}
+			if privKeyB64 != "" {
+				tunnelDir := config.TunnelDir(tag)
+				privKeyPath := filepath.Join(tunnelDir, "server.key")
+				pubKeyPath := filepath.Join(tunnelDir, "server.pub")
+
+				pubKey, err := keys.ImportSoarKey(privKeyB64, privKeyPath, pubKeyPath)
+				if err != nil {
+					out.Warning("Failed to import key: " + err.Error())
+				} else {
+					tunnel.Soar.PrivateKey = privKeyPath
+					tunnel.Soar.PublicKey = pubKey
+					changed = true
+					out.Success(fmt.Sprintf("Public key: %s", pubKey))
+				}
+			}
+
+			// Allowed destination ports
+			allowPorts := ctx.GetArg("allow-ports")
+			if allowPorts == "" {
+				var err error
+				allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, tunnel.Soar.ResolvedAllowPorts())
+				if err != nil {
+					return err
+				}
+			}
+			if allowPorts != "" && allowPorts != tunnel.Soar.ResolvedAllowPorts() {
+				tunnel.Soar.AllowPorts = allowPorts
+				changed = true
+				out.Success(fmt.Sprintf("Allowed ports set to %s", allowPorts))
 			}
 		}
 

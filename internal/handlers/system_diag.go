@@ -140,6 +140,10 @@ func handleSystemDiag(ctx *actions.Context) error {
 			if t.VayDNS != nil {
 				checkFileExists(check, tag, "private key", t.VayDNS.PrivateKey)
 			}
+		case config.TransportSoar:
+			if t.Soar != nil {
+				checkFileExists(check, tag, "private key", t.Soar.PrivateKey)
+			}
 		case config.TransportSlipstream:
 			if t.Slipstream != nil {
 				checkFileExists(check, tag, "certificate", t.Slipstream.Cert)

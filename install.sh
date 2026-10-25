@@ -32,7 +32,7 @@ BINARY="slipgate-${OS}-${ARCH}"
 
 # Override with: SLIPGATE_RELEASE_TAG=v1.5.1 bash install.sh
 RELEASE_TAG="${SLIPGATE_RELEASE_TAG:-}"
-CHANNEL=""  # ← set to "dev" on dev branch, empty on main
+CHANNEL="dev"  # ← set to "dev" on dev branch, empty on main
 
 if [[ -n "$RELEASE_TAG" ]]; then
     URL="https://github.com/${REPO}/releases/download/${RELEASE_TAG}/${BINARY}"
@@ -80,8 +80,14 @@ fi
 chmod +x "${INSTALL_DIR}/slipgate"
 
 info "Running slipgate install..."
-if ! "${INSTALL_DIR}/slipgate" install </dev/tty; then
-    error "slipgate install failed — run 'sudo slipgate install' to retry"
-fi
+info "If installation fails, run 'sudo slipgate install' to retry."
+info "When it finishes, run 'sudo slipgate' to see the menu."
 
-info "Done! Run 'sudo slipgate' to see the menu."
+# exec so slipgate replaces this shell and becomes sudo's direct child.
+# Under `curl | sudo bash`, sudo (use_pty, and always with sudo-rs on
+# Ubuntu 25.10+) starts the command in the pty's background process group.
+# The first prompt's tcsetattr then stops slipgate with SIGTTOU; sudo only
+# resumes it in the foreground (with the user's terminal in raw mode) if it
+# can see the stop, which it can't when slipgate is a grandchild behind a
+# non-interactive bash.
+exec "${INSTALL_DIR}/slipgate" install </dev/tty

@@ -222,6 +222,27 @@ Match Group slipgate-ssh
 	return nil
 }
 
+// UserExists reports whether a system account with this name exists.
+func UserExists(name string) bool {
+	return userExists(name)
+}
+
+// IsSSHUser reports whether name is an account in the slipgate-ssh group.
+// AddSSHUser makes that group the primary one, which /etc/group's member
+// list doesn't show, so this asks id instead.
+func IsSSHUser(name string) bool {
+	out, err := exec.Command("id", "-Gn", name).Output()
+	if err != nil {
+		return false
+	}
+	for _, g := range strings.Fields(string(out)) {
+		if g == config.SSHGroup {
+			return true
+		}
+	}
+	return false
+}
+
 func userExists(name string) bool {
 	err := exec.Command("id", name).Run()
 	return err == nil

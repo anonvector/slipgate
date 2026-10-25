@@ -27,6 +27,10 @@ func b64(s string) string {
 
 // GenerateURI builds a slipnet:// URI from tunnel + backend config.
 func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg *config.Config, opts URIOptions) (string, error) {
+	if _, ok := TunnelTypeMap[tunnel.Transport]; !ok {
+		return "", fmt.Errorf("client config not supported for %s tunnels", tunnel.Transport)
+	}
+
 	var fields [TotalFields]string
 
 	// Version and type

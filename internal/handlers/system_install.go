@@ -114,6 +114,9 @@ func handleSystemInstall(ctx *actions.Context) error {
 		if err := network.AllowPort(53, "udp"); err != nil {
 			out.Warning("Failed to open port 53/udp: " + err.Error())
 		}
+		if err := network.AllowPort(53, "tcp"); err != nil {
+			out.Warning("Failed to open port 53/tcp: " + err.Error())
+		}
 		// Free port 53 from systemd-resolved stub listener
 		if err := network.DisableResolvedStub(); err != nil {
 			out.Warning("Failed to disable systemd-resolved stub: " + err.Error())

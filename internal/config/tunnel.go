@@ -1,10 +1,13 @@
 package config
 
+import "strings"
+
 // Transport types.
 const (
 	TransportDNSTT      = "dnstt"
 	TransportSlipstream = "slipstream"
 	TransportVayDNS     = "vaydns"
+	TransportSoar       = "soar"
 	TransportNaive      = "naive"
 	TransportStunTLS    = "stuntls"
 	TransportSSH        = "direct-ssh"
@@ -25,6 +28,7 @@ type TunnelConfig struct {
 	DNSTT      *DNSTTConfig      `json:"dnstt,omitempty"`
 	Slipstream *SlipstreamConfig `json:"slipstream,omitempty"`
 	VayDNS     *VayDNSConfig     `json:"vaydns,omitempty"`
+	Soar       *SoarConfig       `json:"soar,omitempty"`
 	Naive      *NaiveConfig      `json:"naive,omitempty"`
 	StunTLS    *StunTLSConfig    `json:"stuntls,omitempty"`
 }
@@ -112,6 +116,25 @@ func (v *VayDNSConfig) ResolvedClientIDSize() int {
 	return v.ClientIDSize
 }
 
+// SoarConfig holds config for Soar transport (X25519 + Ed25519-signed handshake).
+type SoarConfig struct {
+	PrivateKey string `json:"private_key"` // path to key file (base64 Ed25519 seed)
+	PublicKey  string `json:"public_key"`  // base64-encoded Ed25519 public key
+	AllowPorts string `json:"allow_ports,omitempty"` // destination ports clients may reach, "any" (default "80,443")
+}
+
+// DefaultSoarAllowPorts matches soar-server's default destination ports.
+const DefaultSoarAllowPorts = "80,443"
+
+// ResolvedAllowPorts returns the allow-ports value, applying defaults.
+func (s *SoarConfig) ResolvedAllowPorts() string {
+	if s == nil || s.AllowPorts == "" {
+		return DefaultSoarAllowPorts
+	}
+	// No spaces: the value is passed unquoted on the systemd ExecStart line.
+	return strings.ReplaceAll(s.AllowPorts, " ", "")
+}
+
 // StunTLSConfig holds config for the TLS + WebSocket SSH proxy transport.
 // Accepts both raw TLS connections (stunnel-style) and WebSocket upgrades,
 // forwarding traffic to the SSH daemon.
@@ -124,7 +147,7 @@ type StunTLSConfig struct {
 // IsDNSTunnel returns true if the transport uses DNS port 53.
 func (t *TunnelConfig) IsDNSTunnel() bool {
 	switch t.Transport {
-	case TransportDNSTT, TransportSlipstream, TransportVayDNS, TransportExternal:
+	case TransportDNSTT, TransportSlipstream, TransportVayDNS, TransportSoar, TransportExternal:
 		return true
 	}
 	return false

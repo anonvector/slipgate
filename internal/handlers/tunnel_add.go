@@ -48,6 +48,10 @@ func handleTunnelAdd(ctx *actions.Context) error {
 	if transport_ == config.TransportExternal {
 		backend = "external"
 	}
+	// Soar dials client-requested destinations itself, like upstream soar-server
+	if transport_ == config.TransportSoar {
+		backend = config.BackendDirect
+	}
 	if backend == "" {
 		var err error
 		backend, err = prompt.Select("Backend", actions.BackendOptions)
@@ -389,6 +393,56 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 		tunnel.VayDNS = vayCfg
 		out.Success(fmt.Sprintf("Public key: %s", pubKey))
 
+	case config.TransportSoar:
+		privKeyPath := filepath.Join(tunnelDir, "server.key")
+		pubKeyPath := filepath.Join(tunnelDir, "server.pub")
+
+		var pubKey string
+		var err error
+
+		switch privKeyB64 := ctx.GetArg("private-key"); {
+		case privKeyB64 != "":
+			out.Info("Importing private key and deriving public key...")
+			pubKey, err = keys.ImportSoarKey(privKeyB64, privKeyPath, pubKeyPath)
+		case sharedKeyDir != "":
+			out.Info("Reusing shared keypair...")
+			if err := copyFile(filepath.Join(sharedKeyDir, "server.key"), privKeyPath); err != nil {
+				return actions.NewError(actions.TunnelAdd, "failed to copy shared private key", err)
+			}
+			if err := copyFile(filepath.Join(sharedKeyDir, "server.pub"), pubKeyPath); err != nil {
+				return actions.NewError(actions.TunnelAdd, "failed to copy shared public key", err)
+			}
+			pubBytes, err := os.ReadFile(pubKeyPath)
+			if err != nil {
+				return actions.NewError(actions.TunnelAdd, "failed to read shared public key", err)
+			}
+			pubKey = strings.TrimSpace(string(pubBytes))
+		default:
+			out.Info("Generating Ed25519 keypair...")
+			pubKey, err = keys.GenerateSoarKeys(privKeyPath, pubKeyPath)
+		}
+		if err != nil {
+			return actions.NewError(actions.TunnelAdd, "key setup failed", err)
+		}
+
+		allowPorts := ctx.GetArg("allow-ports")
+		if allowPorts == "" {
+			allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+			if err != nil {
+				return err
+			}
+		}
+		if allowPorts == config.DefaultSoarAllowPorts {
+			allowPorts = ""
+		}
+
+		tunnel.Soar = &config.SoarConfig{
+			PrivateKey: privKeyPath,
+			PublicKey:  pubKey,
+			AllowPorts: allowPorts,
+		}
+		out.Success(fmt.Sprintf("Public key: %s", pubKey))
+
 	case config.TransportStunTLS:
 		certPath := filepath.Join(tunnelDir, "cert.pem")
 		keyPath := filepath.Join(tunnelDir, "key.pem")
@@ -498,6 +552,7 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 	// Ensure DNS infrastructure is ready for DNS tunnels
 	if tunnel.IsDNSTunnel() {
 		_ = network.AllowPort(53, "udp")
+		_ = network.AllowPort(53, "tcp")
 		_ = network.DisableResolvedStub()
 		if tunnel.Port > 0 && tunnel.HasManagedService() {
 			network.FreePort(tunnel.Port, "udp")
@@ -520,7 +575,11 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 		out.Success(fmt.Sprintf("Tunnel %q created — DNS queries for %s will route to 127.0.0.1:%d", tag, domain, tunnel.Port))
 	} else {
 		out.Success(fmt.Sprintf("Tunnel %q created and started", tag))
-		out.Info(fmt.Sprintf("Share with: slipgate tunnel share %s", tag))
+		if transport_ == config.TransportSoar {
+			out.Info(fmt.Sprintf("soar-client: -zone %s -server-key %s", domain, tunnel.Soar.PublicKey))
+		} else {
+			out.Info(fmt.Sprintf("Share with: slipgate tunnel share %s", tag))
+		}
 	}
 	return nil
 }

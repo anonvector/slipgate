@@ -2,19 +2,19 @@ package dnsrouter
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
-	"time"
+	"syscall"
 
 	"github.com/anonvector/slipgate/internal/config"
+	"github.com/anonvector/slipgate/internal/network"
 )
 
 // Router is a pure Go DNS forwarder that routes queries by domain.
@@ -26,29 +26,14 @@ type Router struct {
 	mu           sync.RWMutex
 	conn         *net.UDPConn
 
-	// Persistent backend connections and pending query tracking
-	backends    map[string]*backendConn
-	backendsMu  sync.Mutex
+	// Persistent backend connections and pending query tracking (backend.go)
+	backends   map[string]*backendConn
+	backendsMu sync.Mutex
 }
 
-// backendConn is a persistent UDP connection to a backend (dnstt-server).
-type backendConn struct {
-	conn     *net.UDPConn
-	pending  sync.Map      // serverTxID (uint16) → *pendingQuery
-	nextTxID atomic.Uint32 // counter for server-side TXID allocation
-}
-
-// pendingQuery tracks a forwarded query so the response can be routed back.
-// originalTxID is the client's TXID, which we restore before writing the
-// response back. Multiplexing clients over a single backend UDP socket
-// requires server-generated TXIDs; using the client's TXID directly would
-// cause cross-client collisions (two clients easily pick the same 16-bit ID)
-// and mis-deliver responses.
-type pendingQuery struct {
-	clientAddr   *net.UDPAddr
-	originalTxID uint16
-	timestamp    time.Time
-}
+// replyFunc delivers a response to the client that sent the query, over
+// whichever transport (UDP or TCP) it arrived on. It must not retain msg.
+type replyFunc func(msg []byte)
 
 // New creates a new DNS router.
 func New(listenAddr string) *Router {
@@ -101,6 +86,16 @@ func (r *Router) ListenAndServe() error {
 		return fmt.Errorf("listen udp: %w", err)
 	}
 	defer r.conn.Close()
+	network.GrowUDPBuffers(r.conn, udpBufferSize)
+
+	// TCP/53 (RFC 7766) for clients and resolvers that can't or won't use
+	// UDP. Failing to bind it is not fatal: UDP keeps working as before.
+	if ln, err := net.Listen("tcp", r.listenAddr); err != nil {
+		log.Printf("tcp listen %s: %v (continuing with UDP only)", r.listenAddr, err)
+	} else {
+		go r.serveTCP(ln)
+		log.Printf("DNS router listening on %s (tcp)", r.listenAddr)
+	}
 
 	log.Printf("DNS router listening on %s", r.listenAddr)
 
@@ -116,13 +111,15 @@ func (r *Router) ListenAndServe() error {
 		packet := make([]byte, n)
 		copy(packet, buf[:n])
 
-		go r.handleQuery(packet, clientAddr)
+		go r.handleQuery(packet, clientAddr, func(msg []byte) {
+			r.conn.WriteToUDP(msg, clientAddr)
+		})
 	}
 }
 
-func (r *Router) handleQuery(packet []byte, clientAddr *net.UDPAddr) {
+func (r *Router) handleQuery(packet []byte, from net.Addr, reply replyFunc) {
 	// Check for HMAC verification query first
-	if r.handleVerify(packet, clientAddr) {
+	if r.handleVerify(packet, from, reply) {
 		return
 	}
 
@@ -141,122 +138,13 @@ func (r *Router) handleQuery(packet []byte, clientAddr *net.UDPAddr) {
 		return
 	}
 
-	// Forward via persistent backend connection
-	bc, err := r.getBackend(backend)
-	if err != nil {
-		log.Printf("backend %s: %v", backend, err)
+	if len(packet) < 12 {
 		return
 	}
-
-	if len(packet) < 2 {
-		return
-	}
-	originalTxID := binary.BigEndian.Uint16(packet[:2])
-
-	pq := &pendingQuery{
-		clientAddr:   clientAddr,
-		originalTxID: originalTxID,
-		timestamp:    time.Now(),
-	}
-
-	// Allocate a server-side TXID that isn't currently in use. LoadOrStore
-	// reserves the slot atomically; if it's already taken (rare — pending
-	// entries expire after 10s and the allocation space is 65536), advance.
-	var serverTxID uint16
-	var stored bool
-	for i := 0; i < 65536; i++ {
-		candidate := uint16(bc.nextTxID.Add(1))
-		if _, loaded := bc.pending.LoadOrStore(candidate, pq); !loaded {
-			serverTxID = candidate
-			stored = true
-			break
-		}
-	}
-	if !stored {
-		log.Printf("dnsrouter: pending TXID space exhausted for backend %s, dropping query from %s", backend, clientAddr)
-		return
-	}
-
-	// Rewrite the query's TXID to the server-side value. `packet` was copied
-	// in the Listen loop before being handed off, so it's safe to mutate.
-	binary.BigEndian.PutUint16(packet[:2], serverTxID)
-
-	if _, err := bc.conn.Write(packet); err != nil {
-		bc.pending.Delete(serverTxID)
-		log.Printf("write to %s: %v", backend, err)
-	}
-}
-
-// getBackend returns a persistent connection to the backend, creating one if needed.
-func (r *Router) getBackend(addr string) (*backendConn, error) {
-	r.backendsMu.Lock()
-	defer r.backendsMu.Unlock()
-
-	if bc, ok := r.backends[addr]; ok {
-		return bc, nil
-	}
-
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := net.DialUDP("udp", nil, udpAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	bc := &backendConn{conn: conn}
-	r.backends[addr] = bc
-
-	// Start response reader goroutine
-	go r.readBackendResponses(bc, addr)
-
-	// Start stale query cleanup
-	go r.cleanPending(bc)
-
-	return bc, nil
-}
-
-// readBackendResponses reads responses from a backend and routes them to clients.
-func (r *Router) readBackendResponses(bc *backendConn, addr string) {
-	buf := make([]byte, 4096)
-	for {
-		n, err := bc.conn.Read(buf)
-		if err != nil {
-			log.Printf("read from %s: %v", addr, err)
-			return
-		}
-		if n < 2 {
-			continue
-		}
-
-		serverTxID := binary.BigEndian.Uint16(buf[:2])
-		val, ok := bc.pending.LoadAndDelete(serverTxID)
-		if !ok {
-			continue // no matching query (stale or duplicate)
-		}
-
-		pq := val.(*pendingQuery)
-		// Restore the client's original TXID before forwarding.
-		binary.BigEndian.PutUint16(buf[:2], pq.originalTxID)
-		r.conn.WriteToUDP(buf[:n], pq.clientAddr)
-	}
-}
-
-// cleanPending removes stale pending queries every 30 seconds.
-func (r *Router) cleanPending(bc *backendConn) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		now := time.Now()
-		bc.pending.Range(func(key, value any) bool {
-			pq := value.(*pendingQuery)
-			if now.Sub(pq.timestamp) > 10*time.Second {
-				bc.pending.Delete(key)
-			}
-			return true
-		})
+	// A backend that is down refuses with ICMP; its service status already
+	// shows that, so don't log it for every query.
+	if err := r.forward(backend, packet, reply); err != nil && !errors.Is(err, syscall.ECONNREFUSED) {
+		log.Printf("forward to %s: %v", backend, err)
 	}
 }
 

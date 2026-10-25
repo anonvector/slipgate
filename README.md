@@ -1,18 +1,19 @@
 # SlipGate
 
-Unified tunnel manager for Linux servers. Manages DNS tunnels (DNSTT, NoizDNS, Slipstream, VayDNS) and HTTPS proxies (NaiveProxy) with systemd services, multi-tunnel DNS routing, and user management. Designed for use with the [SlipNet](https://github.com/anonvector/SlipNet) Android VPN app.
+Unified tunnel manager for Linux servers. Manages DNS tunnels (DNSTT, NoizDNS, Slipstream, VayDNS, Soar) and HTTPS proxies (NaiveProxy) with systemd services, multi-tunnel DNS routing, and user management. Designed for use with the [SlipNet](https://github.com/anonvector/SlipNet) Android VPN app.
 
 [![oosmetrics](https://api.oosmetrics.com/api/v1/badge/achievement/12767996-2dd6-42ed-89a6-5f786c4662b4.svg)](https://oosmetrics.com/repo/anonvector/slipgate)
 
 ## Features
 
-- **Multi-transport**: DNSTT/NoizDNS (DNS tunnels with Curve25519 encryption), Slipstream (QUIC-based DNS), VayDNS (KCP-based DNS with Curve25519), NaiveProxy (HTTPS with Caddy), StunTLS (SSH over TLS + WebSocket)
+- **Multi-transport**: DNSTT/NoizDNS (DNS tunnels with Curve25519 encryption), Slipstream (QUIC-based DNS), VayDNS (KCP-based DNS with Curve25519), Soar (multipath DNS, built in), NaiveProxy (HTTPS with Caddy), StunTLS (SSH over TLS + WebSocket)
 - **Dual backend**: Built-in SOCKS5 proxy or SSH forwarding (custom SSH port supported)
 - **DNS routing**: Single-tunnel or multi-tunnel mode with domain-based dispatch
 - **External routing**: Forward DNS queries for a domain to a custom port for user-managed protocols
 - **WARP integration**: Optional Cloudflare WARP outbound routing (see [dnstun-ezpz](https://github.com/aleskxyz/dnstun-ezpz) for an alternative approach)
 - **User management**: Multi-user SSH + SOCKS credentials (all users authenticate simultaneously), with bulk creation of up to 500 users per call
 - **Live dashboard**: Real-time TUI with CPU, RAM, traffic sparklines, per-protocol connection stats, and tunnel status
+- **Backup & restore**: Move a whole server (config, keys, certificates, users) as one file or as text to copy-paste
 - **Diagnostics**: Built-in health checks for services, ports, keys, DNS resolution, and boot persistence
 - **Interactive TUI + CLI**: Menu-driven setup or scriptable subcommands
 - **Systemd integration**: Service creation, lifecycle, and logs
@@ -24,7 +25,7 @@ Unified tunnel manager for Linux servers. Manages DNS tunnels (DNSTT, NoizDNS, S
 
 - **OS**: Linux (Ubuntu 20.04+, Debian 10+, or similar)
 - **Domain**: DNS A record pointed at your server (required for DNS tunnels and NaiveProxy)
-- **Ports**: 53/udp (DNS tunnels), 443/tcp (NaiveProxy, StunTLS)
+- **Ports**: 53/udp + 53/tcp (DNS tunnels), 443/tcp (NaiveProxy, StunTLS)
 
 ## Quick Start
 
@@ -78,6 +79,8 @@ slipgate install                # Install dependencies and configure server
 slipgate uninstall              # Remove all services, configs, and binaries
 slipgate update                 # Self-update and restart all services
 slipgate restart                # Restart all services (DNS router, tunnels, SOCKS)
+slipgate backup [file]          # Back up config, keys and users (file, or text to copy-paste)
+slipgate restore [file]         # Restore a backup on this server ("-" reads stdin)
 slipgate users                  # Manage SSH/SOCKS users and view configs
 slipgate users add              # Add a single user
 slipgate users bulk_add         # Add multiple users in one batch (random creds, up to 500)
@@ -105,8 +108,8 @@ slipgate router mode            # Switch between single/multi mode
 slipgate router switch          # Change active tunnel (single mode)
 
 # Configuration
-slipgate config export          # Export configuration
-slipgate config import          # Import configuration
+slipgate config export          # Print config.json (no keys; use backup to move a server)
+slipgate config import [path]   # Replace config.json (no keys)
 
 # Internal (used by systemd services)
 slipgate dnsrouter serve        # Start DNS router
@@ -160,6 +163,14 @@ sudo slipgate tunnel add \
   --keep-alive 2s \
   --clientid-size 2 \
   --queue-size 512
+
+# Soar tunnel (built into slipgate, no extra binary; works with stock soar clients)
+# Optional: --private-key <base64 Ed25519 seed> to import an existing key
+sudo slipgate tunnel add \
+  --transport soar \
+  --tag mysoar \
+  --domain r.example.com \
+  --allow-ports 80,443
 
 # Slipstream tunnel
 sudo slipgate tunnel add \
@@ -218,6 +229,10 @@ sudo slipgate tunnel status --tag mydnstt
 # Share tunnel config as slipnet:// URI
 sudo slipgate tunnel share mydnstt
 
+# Move to a new server: same keys and passwords, so client configs keep working.
+# Afterwards point the DNS records (ns.<domain>, NaiveProxy domains) at the new IP.
+ssh root@old-server slipgate backup - | ssh root@new-server slipgate restore - --yes
+
 # Bulk-add SSH/SOCKS users (random passwords, up to 500 per call)
 sudo slipgate users bulk_add --count=50 --prefix=user
 # Creates user001..user050 with random passwords. A single SOCKS reload
@@ -232,7 +247,7 @@ sudo slipgate users bulk_add --count=50 --prefix=user
                        │                  │
                        └────────┬─────────┘
                                 │
-              DNS :53/udp ──────┼────── HTTPS/TLS :443/tcp
+              DNS :53/udp+tcp ──┼────── HTTPS/TLS :443/tcp
                     │           │           │
 ┌───────────────────┼───────────┼───────────┼──────────────────┐
 │  SERVER           v           │           v                  │
@@ -285,6 +300,7 @@ sudo slipgate users bulk_add --count=50 --prefix=user
 | **DNSTT/NoizDNS** | DNS | 53/udp | Curve25519 encrypted DNS tunnel. A single server serves both DNSTT and NoizDNS clients. NoizDNS adds DPI evasion with base36/hex encoding and CDN prefix stripping |
 | **Slipstream** | QUIC DNS | 53/udp | QUIC-based tunnel with certificate authentication |
 | **VayDNS** | KCP DNS | 53/udp | KCP-based DNS tunnel with Curve25519 encryption. Supports configurable idle timeout, keepalive, queue size, and multiple DNS record types |
+| **Soar** | DNS | 53/udp | [Soar](https://github.com/getlantern/soar) multipath DNS tunnel (X25519 + Ed25519-signed handshake), served by slipgate itself and compatible with stock soar clients. No SOCKS/SSH backend: like soar-server, it dials the destination each stream names, limited to public addresses and the allowed ports (default `80,443`, or `any`). Configure clients with the zone and the base64 public key from `tunnel status`; there is no `slipnet://` URI |
 | **NaiveProxy** | HTTPS | 443/tcp | Caddy with forwardproxy plugin. Auto-TLS via Let's Encrypt. Probe-resistant with decoy site |
 | **StunTLS** | TLS/WSS | 443/tcp | SSH over TLS + WebSocket proxy. Auto-detects WebSocket, HTTP CONNECT, raw TLS, and payload (DPI bypass) modes. Self-signed TLS cert, no domain required |
 | **External** | DNS | 53/udp | Routes DNS queries for a domain to a user-specified UDP port. No managed service — use for custom/private protocol testing |
@@ -301,6 +317,7 @@ Each DNS tunnel instance requires its own subdomain. When using both SOCKS and S
 | slipstream-ssh | `ss.example.com` | SSH |
 | vaydns-socks | `v.example.com` | SOCKS5 |
 | vaydns-ssh | `vs.example.com` | SSH |
+| soar | `r.example.com` | Direct (dials client destinations) |
 | naive-socks | `example.com` | SOCKS5 (shared domain) |
 | naive-ssh | `example.com` | SSH (shared domain) |
 
@@ -323,6 +340,8 @@ A   example.com           → <server IP>
 
 - **Single mode**: One active tunnel runs; DNS router on port 53 forwards to it
 - **Multi mode**: All tunnels run on local ports; DNS router on port 53 dispatches queries by domain. Auto-enabled when multiple DNS tunnels are created.
+
+The DNS router answers on both UDP and TCP port 53. Queries arriving over TCP (RFC 7766, pipelined) are forwarded to the tunnel over UDP and the answers returned on the same TCP connection, so every DNS tunnel works for resolvers and clients that use TCP/53 (e.g. Soar clients on networks that block UDP/53), with no change to the tunnel servers.
 
 ## Client Configuration
 
@@ -361,7 +380,7 @@ make release            # Build release binaries
 
 ## Credits
 
-Built on top of [dnstm](https://github.com/net2share/dnstm) and [vaydns](https://github.com/net2share/vaydns) by [net2share](https://github.com/net2share). WARP integration inspired by [dnstun-ezpz](https://github.com/aleskxyz/dnstun-ezpz).
+Built on top of [dnstm](https://github.com/net2share/dnstm) and [vaydns](https://github.com/net2share/vaydns) by [net2share](https://github.com/net2share), and [soar](https://github.com/getlantern/soar) by [Lantern](https://github.com/getlantern). WARP integration inspired by [dnstun-ezpz](https://github.com/aleskxyz/dnstun-ezpz).
 
 ## License
 

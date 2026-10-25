@@ -16,6 +16,8 @@ func handleConfigExport(ctx *actions.Context) error {
 		return actions.NewError(actions.ConfigExport, "failed to marshal config", err)
 	}
 	ctx.Output.Print(string(data))
+	// Warning goes to stderr, so a redirected export stays plain JSON.
+	ctx.Output.Warning("This is config.json only, without tunnel keys or certificates. To move a server, use 'slipgate backup'.")
 	return nil
 }
 

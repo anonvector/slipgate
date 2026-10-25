@@ -22,6 +22,12 @@ func actionToCommand(a *actions.Action, use string) *cobra.Command {
 
 			// Map positional args to input fields
 			for i, input := range a.Inputs {
+				if input.Bool {
+					if set, _ := cmd.Flags().GetBool(input.Key); set {
+						ctx.Args[input.Key] = "true"
+					}
+					continue
+				}
 				if val, _ := cmd.Flags().GetString(input.Key); val != "" {
 					ctx.Args[input.Key] = val
 				} else if i < len(args) {
@@ -44,6 +50,10 @@ func actionToCommand(a *actions.Action, use string) *cobra.Command {
 
 	// Add flags for each input field
 	for _, input := range a.Inputs {
+		if input.Bool {
+			cmd.Flags().Bool(input.Key, false, input.Label)
+			continue
+		}
 		cmd.Flags().String(input.Key, input.Default, input.Label)
 	}
 

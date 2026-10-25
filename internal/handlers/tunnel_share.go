@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/anonvector/slipgate/internal/actions"
 	"github.com/anonvector/slipgate/internal/clientcfg"
 	"github.com/anonvector/slipgate/internal/config"
@@ -19,6 +21,11 @@ func handleTunnelShare(ctx *actions.Context) error {
 	if tunnel == nil {
 		return actions.NewErrorWithHint(actions.TunnelShare, "tunnel not found",
 			"Run 'slipgate tunnel status' to see available tunnels", nil)
+	}
+
+	if tunnel.Transport == config.TransportSoar {
+		return actions.NewErrorWithHint(actions.TunnelShare, "soar tunnels have no slipnet:// URI",
+			fmt.Sprintf("Configure soar-client with zone %s and server key %s", tunnel.Domain, tunnel.Soar.PublicKey), nil)
 	}
 
 	backend := cfg.GetBackend(tunnel.Backend)

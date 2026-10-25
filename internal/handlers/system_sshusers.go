@@ -404,11 +404,13 @@ func showUserConfigs(cfg *config.Config, username, password string, out actions.
 			continue
 		}
 
-		// Show public key for DNSTT/VayDNS tunnels
+		// Show public key for DNSTT/VayDNS/Soar tunnels
 		if t.Transport == config.TransportDNSTT && t.DNSTT != nil && t.DNSTT.PublicKey != "" {
 			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.DNSTT.PublicKey))
 		} else if t.Transport == config.TransportVayDNS && t.VayDNS != nil && t.VayDNS.PublicKey != "" {
 			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.VayDNS.PublicKey))
+		} else if t.Transport == config.TransportSoar && t.Soar != nil && t.Soar.PublicKey != "" {
+			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.Soar.PublicKey))
 		}
 
 		modes := []string{""}
