@@ -345,17 +345,27 @@ func handleSystemInstall(ctx *actions.Context) error {
 			}
 		}
 
+		// Soar has its own backends: direct (no login) and/or SSH (per-user logins)
 		soarAllowPorts := ""
 		tunnelBackends := backends
 		if selectedTransport == config.TransportSoar {
-			soarAllowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+			soarBackend, err := prompt.Select("Backend", actions.SoarBackendOptions)
 			if err != nil {
 				return err
 			}
-			if soarAllowPorts == config.DefaultSoarAllowPorts {
-				soarAllowPorts = ""
+			tunnelBackends = []string{soarBackend}
+			if soarBackend == "both" {
+				tunnelBackends = []string{config.BackendDirect, config.BackendSSH}
 			}
-			tunnelBackends = []string{config.BackendDirect}
+			if tunnelBackends[0] == config.BackendDirect {
+				soarAllowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+				if err != nil {
+					return err
+				}
+				if soarAllowPorts == config.DefaultSoarAllowPorts {
+					soarAllowPorts = ""
+				}
+			}
 		}
 
 			for bIdx, b := range tunnelBackends {
@@ -377,6 +387,8 @@ func handleSystemInstall(ctx *actions.Context) error {
 						sshHint = "ss." + parentDomain
 					} else if selectedTransport == config.TransportVayDNS {
 						sshHint = "vs." + parentDomain
+					} else if selectedTransport == config.TransportSoar {
+						sshHint = "rs." + parentDomain
 					}
 					sshDomain, err := prompt.String(fmt.Sprintf("Domain for %s", tag), sshHint)
 					if err != nil {
@@ -837,7 +849,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 			}
 		}
 	}
-	printSoarClients(out, allTunnels)
+	printSoarLinks(cfg, out, allTunnels)
 
 	out.Print("  ══════════════════════════════════════════════════════")
 	out.Print("")
@@ -875,15 +887,21 @@ func naiveAwareVariants(t *config.TunnelConfig) []naiveURIVariant {
 	}
 }
 
-// printSoarClients prints the soar-client settings for each Soar tunnel,
-// which has no slipnet:// URI.
-func printSoarClients(out actions.OutputWriter, tunnels []config.TunnelConfig) {
-	for _, t := range tunnels {
-		if t.Transport != config.TransportSoar || t.Soar == nil {
+// printSoarLinks prints, for each direct-backend Soar tunnel, its SlipNet
+// config and the zone and key other Soar clients (e.g. Lantern) need. Those
+// tunnels have no login, so one config serves everyone; Soar+SSH configs
+// carry a user's login and are printed per user like other SSH tunnels.
+func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) {
+	for i := range tunnels {
+		t := &tunnels[i]
+		if t.Transport != config.TransportSoar || t.Backend != config.BackendDirect || t.Soar == nil {
 			continue
 		}
-		out.Print(fmt.Sprintf("    [%s] soar-client", t.Tag))
-		out.Print(fmt.Sprintf("    -zone %s -server-key %s", t.Domain, t.Soar.PublicKey))
+		out.Print(fmt.Sprintf("    [%s] (no login)", t.Tag))
+		if uri, err := clientcfg.GenerateURI(t, nil, cfg, clientcfg.URIOptions{}); err == nil {
+			out.Print(fmt.Sprintf("    %s", uri))
+		}
+		out.Print(fmt.Sprintf("    Other Soar clients: zone %s, server key %s", t.Domain, t.Soar.PublicKey))
 		out.Print("")
 	}
 }

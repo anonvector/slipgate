@@ -48,9 +48,13 @@ func handleTunnelAdd(ctx *actions.Context) error {
 	if transport_ == config.TransportExternal {
 		backend = "external"
 	}
-	// Soar dials client-requested destinations itself, like upstream soar-server
-	if transport_ == config.TransportSoar {
-		backend = config.BackendDirect
+	// Soar dials destinations itself (direct) or reaches only the SSH backend
+	if transport_ == config.TransportSoar && backend == "" {
+		var err error
+		backend, err = prompt.Select("Backend", actions.SoarBackendOptions)
+		if err != nil {
+			return err
+		}
 	}
 	if backend == "" {
 		var err error
@@ -74,10 +78,13 @@ func handleTunnelAdd(ctx *actions.Context) error {
 		}
 	}
 
-	// Expand "both" into socks + ssh
+	// Expand "both" into socks + ssh (direct + ssh for Soar)
 	backends := []string{backend}
 	if backend == "both" {
 		backends = []string{config.BackendSOCKS, config.BackendSSH}
+		if transport_ == config.TransportSoar {
+			backends = []string{config.BackendDirect, config.BackendSSH}
+		}
 	}
 
 	var failed, succeeded []string
@@ -96,6 +103,8 @@ func handleTunnelAdd(ctx *actions.Context) error {
 					sshHint = "ss." + parentDomain
 				} else if transport_ == config.TransportVayDNS {
 					sshHint = "vs." + parentDomain
+				} else if transport_ == config.TransportSoar {
+					sshHint = "rs." + parentDomain
 				}
 				sshDomain, err := prompt.String(fmt.Sprintf("Domain for %s", tunnelTag), sshHint)
 				if err != nil {
@@ -425,15 +434,20 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 			return actions.NewError(actions.TunnelAdd, "key setup failed", err)
 		}
 
-		allowPorts := ctx.GetArg("allow-ports")
-		if allowPorts == "" {
-			allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
-			if err != nil {
-				return err
+		// Only the direct backend reaches arbitrary destinations; with SSH
+		// the server reaches the SSH backend alone.
+		allowPorts := ""
+		if backend == config.BackendDirect {
+			allowPorts = ctx.GetArg("allow-ports")
+			if allowPorts == "" {
+				allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+				if err != nil {
+					return err
+				}
 			}
-		}
-		if allowPorts == config.DefaultSoarAllowPorts {
-			allowPorts = ""
+			if allowPorts == config.DefaultSoarAllowPorts {
+				allowPorts = ""
+			}
 		}
 
 		tunnel.Soar = &config.SoarConfig{
@@ -575,8 +589,10 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 		out.Success(fmt.Sprintf("Tunnel %q created — DNS queries for %s will route to 127.0.0.1:%d", tag, domain, tunnel.Port))
 	} else {
 		out.Success(fmt.Sprintf("Tunnel %q created and started", tag))
-		if transport_ == config.TransportSoar {
-			out.Info(fmt.Sprintf("soar-client: -zone %s -server-key %s", domain, tunnel.Soar.PublicKey))
+		if transport_ == config.TransportSoar && backend == config.BackendDirect {
+			// No login, so one config serves everyone: show it now
+			out.Print("")
+			printSoarLinks(cfg, out, []config.TunnelConfig{tunnel})
 		} else {
 			out.Info(fmt.Sprintf("Share with: slipgate tunnel share %s", tag))
 		}

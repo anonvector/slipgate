@@ -332,9 +332,9 @@ func handleTunnelEdit(ctx *actions.Context) error {
 				}
 			}
 
-			// Allowed destination ports
+			// Allowed destination ports (direct backend only; SSH reaches the backend alone)
 			allowPorts := ctx.GetArg("allow-ports")
-			if allowPorts == "" {
+			if allowPorts == "" && tunnel.Backend == config.BackendDirect {
 				var err error
 				allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, tunnel.Soar.ResolvedAllowPorts())
 				if err != nil {

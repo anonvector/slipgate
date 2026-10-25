@@ -164,13 +164,23 @@ sudo slipgate tunnel add \
   --clientid-size 2 \
   --queue-size 512
 
-# Soar tunnel (built into slipgate, no extra binary; works with stock soar clients)
+# Soar tunnel (built into slipgate, no extra binary). Direct backend: no
+# login, the server reaches public sites itself (works with stock soar clients)
 # Optional: --private-key <base64 Ed25519 seed> to import an existing key
 sudo slipgate tunnel add \
   --transport soar \
+  --backend direct \
   --tag mysoar \
   --domain r.example.com \
   --allow-ports 80,443
+
+# Soar with the SSH backend: the server reaches only the SSH server, so each
+# person needs their own SSH user (SlipNet; share with 'slipgate tunnel share')
+sudo slipgate tunnel add \
+  --transport soar \
+  --backend ssh \
+  --tag mysoar-ssh \
+  --domain rs.example.com
 
 # Slipstream tunnel
 sudo slipgate tunnel add \
@@ -300,7 +310,7 @@ sudo slipgate users bulk_add --count=50 --prefix=user
 | **DNSTT/NoizDNS** | DNS | 53/udp | Curve25519 encrypted DNS tunnel. A single server serves both DNSTT and NoizDNS clients. NoizDNS adds DPI evasion with base36/hex encoding and CDN prefix stripping |
 | **Slipstream** | QUIC DNS | 53/udp | QUIC-based tunnel with certificate authentication |
 | **VayDNS** | KCP DNS | 53/udp | KCP-based DNS tunnel with Curve25519 encryption. Supports configurable idle timeout, keepalive, queue size, and multiple DNS record types |
-| **Soar** | DNS | 53/udp | [Soar](https://github.com/getlantern/soar) multipath DNS tunnel (X25519 + Ed25519-signed handshake), served by slipgate itself and compatible with stock soar clients. No SOCKS/SSH backend: like soar-server, it dials the destination each stream names, limited to public addresses and the allowed ports (default `80,443`, or `any`). Configure clients with the zone and the base64 public key from `tunnel status`; there is no `slipnet://` URI |
+| **Soar** | DNS | 53/udp | [Soar](https://github.com/getlantern/soar) multipath DNS tunnel (X25519 + Ed25519-signed handshake), served by slipgate itself. Soar has no per-user login, so it has two backends. **Direct**: like soar-server, it dials the destination each stream names, limited to public addresses and the allowed ports (default `80,443`, or `any`); anyone who finds the zone can use it, and it works with stock soar clients (zone + base64 public key from `tunnel status`). **SSH**: it reaches only the SSH server, so access goes through SSH users, added and removed one by one. Both export `slipnet://` configs for a SlipNet version with Soar support |
 | **NaiveProxy** | HTTPS | 443/tcp | Caddy with forwardproxy plugin. Auto-TLS via Let's Encrypt. Probe-resistant with decoy site |
 | **StunTLS** | TLS/WSS | 443/tcp | SSH over TLS + WebSocket proxy. Auto-detects WebSocket, HTTP CONNECT, raw TLS, and payload (DPI bypass) modes. Self-signed TLS cert, no domain required |
 | **External** | DNS | 53/udp | Routes DNS queries for a domain to a user-specified UDP port. No managed service — use for custom/private protocol testing |
@@ -317,7 +327,8 @@ Each DNS tunnel instance requires its own subdomain. When using both SOCKS and S
 | slipstream-ssh | `ss.example.com` | SSH |
 | vaydns-socks | `v.example.com` | SOCKS5 |
 | vaydns-ssh | `vs.example.com` | SSH |
-| soar | `r.example.com` | Direct (dials client destinations) |
+| soar-direct | `r.example.com` | Direct (dials client destinations) |
+| soar-ssh | `rs.example.com` | SSH |
 | naive-socks | `example.com` | SOCKS5 (shared domain) |
 | naive-ssh | `example.com` | SSH (shared domain) |
 

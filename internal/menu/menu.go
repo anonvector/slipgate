@@ -326,6 +326,12 @@ func batchTunnelAdd(cfg *config.Config) error {
 			args["backend"] = config.BackendSSH
 		case config.TransportExternal:
 			args["backend"] = "external"
+		case config.TransportSoar:
+			backend, err := prompt.Select("Backend", actions.SoarBackendOptions)
+			if err != nil {
+				return err
+			}
+			args["backend"] = backend
 		default:
 			backend, err := prompt.Select("Backend", actions.BackendOptions)
 			if err != nil {

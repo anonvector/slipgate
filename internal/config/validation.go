@@ -407,6 +407,10 @@ func validateBackend(backend string) error {
 }
 
 func validateTransportBackend(transport, backend string) error {
-	// All combinations are valid
+	// Soar dials destinations itself (direct) or reaches only the SSH
+	// backend; it never relays through the SOCKS proxy.
+	if transport == TransportSoar && backend != BackendDirect && backend != BackendSSH {
+		return fmt.Errorf("soar backend must be %q or %q, not %q", BackendDirect, BackendSSH, backend)
+	}
 	return nil
 }

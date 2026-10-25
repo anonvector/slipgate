@@ -15,13 +15,15 @@ func init() {
 		Use:   "serve",
 		Short: "Start the Soar DNS tunnel server (used by systemd)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			listen, _ := cmd.Flags().GetString("listen")
-			zone, _ := cmd.Flags().GetString("zone")
-			keyFile, _ := cmd.Flags().GetString("key-file")
-			allowPorts, _ := cmd.Flags().GetString("allow-ports")
-			allowPrivate, _ := cmd.Flags().GetBool("allow-private")
-			verbose, _ := cmd.Flags().GetBool("verbose")
-			return proxy.ServeSoar(listen, zone, keyFile, allowPorts, allowPrivate, verbose)
+			var opts proxy.SoarOptions
+			opts.Listen, _ = cmd.Flags().GetString("listen")
+			opts.Zone, _ = cmd.Flags().GetString("zone")
+			opts.KeyFile, _ = cmd.Flags().GetString("key-file")
+			opts.Backend, _ = cmd.Flags().GetString("backend")
+			opts.AllowPorts, _ = cmd.Flags().GetString("allow-ports")
+			opts.AllowPrivate, _ = cmd.Flags().GetBool("allow-private")
+			opts.Verbose, _ = cmd.Flags().GetBool("verbose")
+			return proxy.ServeSoar(opts)
 		},
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -29,8 +31,9 @@ func init() {
 	serveCmd.Flags().String("listen", "127.0.0.1:5310", "UDP listen address")
 	serveCmd.Flags().String("zone", "", "Tunnel zone delegated to this server")
 	serveCmd.Flags().String("key-file", "", "File holding the base64 Ed25519 private key")
-	serveCmd.Flags().String("allow-ports", "80,443", `Destination ports streams may reach, or "any"`)
-	serveCmd.Flags().Bool("allow-private", false, "Allow non-public destinations (lab use only)")
+	serveCmd.Flags().String("backend", "", "Only destination streams may reach (SSH backend); empty = public destinations")
+	serveCmd.Flags().String("allow-ports", "80,443", `Destination ports without a backend, or "any"`)
+	serveCmd.Flags().Bool("allow-private", false, "Allow non-public destinations without a backend (lab use only)")
 	serveCmd.Flags().Bool("verbose", false, "Debug logging")
 	_ = serveCmd.MarkFlagRequired("zone")
 	_ = serveCmd.MarkFlagRequired("key-file")

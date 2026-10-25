@@ -17,7 +17,7 @@ func init() {
 			{Key: "keep-alive", Label: "Keep alive interval (VayDNS)", DependsOn: "transport", DependsOnValues: []string{"vaydns"}},
 			{Key: "clientid-size", Label: "Client ID size (VayDNS)", DependsOn: "transport", DependsOnValues: []string{"vaydns"}},
 			{Key: "queue-size", Label: "Queue size (VayDNS)", DependsOn: "transport", DependsOnValues: []string{"vaydns"}},
-			{Key: "allow-ports", Label: "Allowed destination ports (Soar)", DependsOn: "transport", DependsOnValues: []string{"soar"}},
+			{Key: "allow-ports", Label: "Allowed destination ports (Soar, direct backend)", CLIOnly: true},
 			{Key: "port", Label: "Target UDP port", DependsOn: "transport", DependsOnValues: []string{"external"}},
 			{Key: "email", Label: "Email (for Let's Encrypt)", DependsOn: "transport", DependsOnValues: []string{"naive"}},
 			{Key: "decoy-url", Label: "Decoy URL", DependsOn: "transport", DependsOnValues: []string{"naive"}},

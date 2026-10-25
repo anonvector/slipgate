@@ -69,7 +69,36 @@ const (
 	FSSHWsCustomHost          = 58
 	// v22: SSH payload (raw prefix for DPI bypass)
 	FSSHPayload               = 59
-	TotalFields               = 60
+	// v23-v24: multi-resolver mode
+	FResolverMode             = 60
+	FRRSpreadCount            = 61
+	// v25-v28: VLESS + SNI fragmentation (defaults only; SlipGate has no VLESS)
+	FVlessUUID                = 62
+	FVlessSecurity            = 63
+	FVlessTransport           = 64
+	FVlessWsPath              = 65
+	FCdnIP                    = 66
+	FCdnPort                  = 67
+	FSniFragmentEnabled       = 68
+	FSniFragmentStrategy      = 69
+	FSniFragmentDelayMs       = 70
+	FLegacySni                = 71
+	FCHPadding                = 72
+	FWSHeaderObfuscation      = 73
+	FWSPadding                = 74
+	FSniSpoofTTL              = 75
+	FFakeDecoyHost            = 76
+	FTCPMaxSeg                = 77
+	FVlessSNI                 = 78
+	// v29: Soar
+	FSoarDiscovery            = 79
+	FSoarCountry              = 80
+	FSoarTCPMode              = 81
+	TotalFields               = 82
+
+	// V22Fields is the length of a v22 URI. Transports the v22 app already
+	// understands are still exported as v22, so their URIs don't change.
+	V22Fields = 60
 )
 
 // Client modes for DNSTT transport (server is the same, client behavior differs).
@@ -100,6 +129,12 @@ var TunnelTypeMap = map[string]map[string]map[string]string{
 		"": {
 			config.BackendSOCKS: "vaydns",
 			config.BackendSSH:   "vaydns_ssh",
+		},
+	},
+	config.TransportSoar: {
+		"": {
+			config.BackendDirect: "soar",
+			config.BackendSSH:    "soar_ssh",
 		},
 	},
 	config.TransportNaive: {

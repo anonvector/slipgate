@@ -90,6 +90,24 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	fields[FSSHHttpProxyPort] = "8080"
 	// v22 defaults
 	fields[FSSHPayload] = b64("")
+	// v23-v28 defaults, as the app exports them for a non-VLESS profile
+	fields[FResolverMode] = "roundrobin"
+	fields[FRRSpreadCount] = "3"
+	fields[FVlessSecurity] = "tls"
+	fields[FVlessTransport] = "ws"
+	fields[FVlessWsPath] = "/"
+	fields[FCdnPort] = "443"
+	fields[FSniFragmentEnabled] = "1"
+	fields[FSniFragmentStrategy] = "micro"
+	fields[FSniFragmentDelayMs] = "300"
+	fields[FCHPadding] = "0"
+	fields[FWSHeaderObfuscation] = "1"
+	fields[FWSPadding] = "0"
+	fields[FSniSpoofTTL] = "8"
+	fields[FTCPMaxSeg] = "0"
+	// v29 defaults: resolver discovery off, TCP/53 paths on demand
+	fields[FSoarDiscovery] = "0"
+	fields[FSoarTCPMode] = "auto"
 
 	// Transport-specific
 	switch tunnel.Transport {
@@ -118,6 +136,21 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 				fields[FVayDNSKeepalive] = durationToSeconds(tunnel.VayDNS.ResolvedKeepAlive())
 			}
 			fields[FVayDNSClientIdSize] = fmt.Sprintf("%d", tunnel.VayDNS.ResolvedClientIDSize())
+		}
+
+	case config.TransportSoar:
+		// The Soar tunnel types need a v29 app
+		fields[FVersion] = "29"
+		if tunnel.Soar != nil {
+			fields[FPublicKey] = tunnel.Soar.PublicKey
+		}
+		// Soar+SSH: the Soar server dials the SSH backend itself and allows
+		// that address only, so the app must ask for exactly that address.
+		if tunnel.Backend == config.BackendSSH && backend != nil {
+			if host, port, err := net.SplitHostPort(backend.Address); err == nil {
+				fields[FSSHHost] = host
+				fields[FSSHPort] = port
+			}
 		}
 
 	case config.TransportSlipstream:
@@ -192,7 +225,10 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 		fields[FNaivePass] = b64(password)
 	}
 
-	return Encode(fields), nil
+	if fields[FVersion] == "29" {
+		return Encode(fields[:]), nil
+	}
+	return Encode(fields[:V22Fields]), nil
 }
 
 func durationToSeconds(d string) string {

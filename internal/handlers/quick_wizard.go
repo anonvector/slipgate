@@ -75,9 +75,15 @@ func handleQuickWizard(ctx *actions.Context) error {
 			}
 			backends = []string{backend}
 		} else if tr == config.TransportSoar {
-			// Soar dials client-requested destinations itself
-			backend = config.BackendDirect
+			// Soar dials destinations itself (direct) or reaches only the SSH backend
+			backend, err = prompt.Select(fmt.Sprintf("Backend for %s", tr), actions.SoarBackendOptions)
+			if err != nil {
+				return err
+			}
 			backends = []string{backend}
+			if backend == "both" {
+				backends = []string{config.BackendDirect, config.BackendSSH}
+			}
 		} else {
 			backend, err = prompt.Select(fmt.Sprintf("Backend for %s", tr), actions.BackendOptions)
 			if err != nil {
@@ -173,7 +179,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 		}
 
 		var allowPorts string
-		if tr == config.TransportSoar {
+		if tr == config.TransportSoar && backends[0] == config.BackendDirect {
 			allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
 			if err != nil {
 				return err
@@ -350,6 +356,8 @@ func handleQuickWizard(ctx *actions.Context) error {
 						sshHint = "ss." + parentDomain
 					} else if s.transport == config.TransportVayDNS {
 						sshHint = "vs." + parentDomain
+					} else if s.transport == config.TransportSoar {
+						sshHint = "rs." + parentDomain
 					}
 					tunnelDomain, err = prompt.String(fmt.Sprintf("Domain for %s", tag), sshHint)
 					if err != nil {
@@ -677,7 +685,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 			}
 		}
 	}
-	printSoarClients(out, allTunnels)
+	printSoarLinks(cfg, out, allTunnels)
 
 	out.Print("  ══════════════════════════════════════════════════════")
 	out.Print("")

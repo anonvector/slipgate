@@ -35,6 +35,14 @@ var ClientModeOptions = []SelectOption{
 	{Value: "noizdns", Label: "NoizDNS — DNS tunnel with DPI evasion"},
 }
 
+// SoarBackendOptions replaces BackendOptions for Soar, which dials
+// destinations itself (direct) or reaches only the SSH backend.
+var SoarBackendOptions = []SelectOption{
+	{Value: "direct", Label: "Direct — no login; server reaches public sites (Lantern-compatible)"},
+	{Value: "ssh", Label: "SSH — per-user logins (SlipNet)"},
+	{Value: "both", Label: "Both — Direct + SSH"},
+}
+
 var BackendOptions = []SelectOption{
 	{Value: "socks", Label: "SOCKS — SOCKS5 proxy"},
 	{Value: "ssh", Label: "SSH — SSH tunnel"},

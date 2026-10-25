@@ -117,10 +117,16 @@ func (v *VayDNSConfig) ResolvedClientIDSize() int {
 }
 
 // SoarConfig holds config for Soar transport (X25519 + Ed25519-signed handshake).
+//
+// Soar's server dials each stream's destination itself and has no per-user
+// login. With the direct backend it reaches public destinations on
+// AllowPorts, so anyone who finds the zone can use it. With the SSH backend
+// it reaches the SSH backend address and nothing else, so access goes
+// through SSH logins.
 type SoarConfig struct {
 	PrivateKey string `json:"private_key"` // path to key file (base64 Ed25519 seed)
 	PublicKey  string `json:"public_key"`  // base64-encoded Ed25519 public key
-	AllowPorts string `json:"allow_ports,omitempty"` // destination ports clients may reach, "any" (default "80,443")
+	AllowPorts string `json:"allow_ports,omitempty"` // direct backend: destination ports, "any" (default "80,443")
 }
 
 // DefaultSoarAllowPorts matches soar-server's default destination ports.

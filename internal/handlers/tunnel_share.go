@@ -23,9 +23,17 @@ func handleTunnelShare(ctx *actions.Context) error {
 			"Run 'slipgate tunnel status' to see available tunnels", nil)
 	}
 
-	if tunnel.Transport == config.TransportSoar {
-		return actions.NewErrorWithHint(actions.TunnelShare, "soar tunnels have no slipnet:// URI",
-			fmt.Sprintf("Configure soar-client with zone %s and server key %s", tunnel.Domain, tunnel.Soar.PublicKey), nil)
+	// Direct-backend Soar has no login: one config serves everyone
+	if tunnel.Transport == config.TransportSoar && tunnel.Backend == config.BackendDirect {
+		uri, err := clientcfg.GenerateURI(tunnel, nil, cfg, clientcfg.URIOptions{})
+		if err != nil {
+			return actions.NewError(actions.TunnelShare, "failed to generate URI", err)
+		}
+		ctx.Output.Print(uri)
+		if tunnel.Soar != nil {
+			ctx.Output.Info(fmt.Sprintf("Other Soar clients: zone %s, server key %s", tunnel.Domain, tunnel.Soar.PublicKey))
+		}
+		return nil
 	}
 
 	backend := cfg.GetBackend(tunnel.Backend)

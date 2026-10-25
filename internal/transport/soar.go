@@ -43,6 +43,15 @@ func buildSoarExecStart(tunnel *config.TunnelConfig, cfg *config.Config) (string
 	}
 
 	// Loopback only: queries reach soar through the DNS router on port 53.
-	return fmt.Sprintf("%s soar serve --listen 127.0.0.1:%d --zone %s --key-file %s --allow-ports %s",
-		execPath, tunnel.Port, tunnel.Domain, tunnel.Soar.PrivateKey, tunnel.Soar.ResolvedAllowPorts()), nil
+	execStart := fmt.Sprintf("%s soar serve --listen 127.0.0.1:%d --zone %s --key-file %s",
+		execPath, tunnel.Port, tunnel.Domain, tunnel.Soar.PrivateKey)
+	if tunnel.Backend == config.BackendSSH {
+		// Streams may reach the SSH backend and nothing else.
+		backend := cfg.GetBackend(config.BackendSSH)
+		if backend == nil {
+			return "", fmt.Errorf("backend %q not found", config.BackendSSH)
+		}
+		return execStart + " --backend " + backend.Address, nil
+	}
+	return execStart + " --allow-ports " + tunnel.Soar.ResolvedAllowPorts(), nil
 }

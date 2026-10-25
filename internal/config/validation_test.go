@@ -19,6 +19,8 @@ func importable() *Config {
 		{Tag: "naive-ssh", Transport: TransportNaive, Backend: BackendSSH, Domain: "example.com",
 			Naive: &NaiveConfig{Email: "a@example.com", Port: 443}},
 		{Tag: "ext", Transport: TransportExternal, Backend: BackendSOCKS, Domain: "x.example.com", Port: 5313},
+		{Tag: "soar-ssh", Transport: TransportSoar, Backend: BackendSSH, Domain: "rs.example.com", Port: 5314,
+			Soar: &SoarConfig{PrivateKey: "server.key", PublicKey: "11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="}},
 	}
 	c.Users = []UserConfig{{Username: "alice", Password: "pw"}, {Username: "bob_2", Password: "with space"}, {Username: "Carol.9", Password: "x"}}
 	return c
@@ -39,6 +41,7 @@ func TestValidateImportedRejectsInjection(t *testing.T) {
 		"bad vaydns duration":       func(c *Config) { c.Tunnels[1].VayDNS.IdleTimeout = "2m -x" },
 		"bad vaydns record type":    func(c *Config) { c.Tunnels[1].VayDNS.RecordType = "txt -x" },
 		"bad soar ports":            func(c *Config) { c.Tunnels[2].Soar.AllowPorts = "80 --allow-private" },
+		"soar via socks":            func(c *Config) { c.Tunnels[2].Backend = BackendSOCKS },
 		"bad dnstt public key":      func(c *Config) { c.Tunnels[0].DNSTT.PublicKey = "/etc/shadow" },
 		"caddyfile brace":           func(c *Config) { c.Tunnels[3].Naive.Password = "pw}" },
 		"caddyfile space":           func(c *Config) { c.Tunnels[3].Naive.Email = "a@example.com import /x" },
