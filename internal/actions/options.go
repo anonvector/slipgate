@@ -22,6 +22,7 @@ var InstallTransportOptions = []SelectOption{
 	{Value: "dnstt", Label: "DNSTT / NoizDNS — DNS tunnel"},
 	{Value: "slipstream", Label: "Slipstream — QUIC DNS tunnel"},
 	{Value: "vaydns", Label: "VayDNS — KCP DNS tunnel"},
+	{Value: "soar", Label: "Soar — multipath DNS tunnel (soar-client compatible)"},
 	{Value: "naive", Label: "NaiveProxy — HTTPS proxy with Caddy"},
 	{Value: "stuntls", Label: "StunTLS — SSH over TLS + WebSocket proxy"},
 	{Value: "direct-ssh", Label: "SSH — Direct SSH tunnel"},

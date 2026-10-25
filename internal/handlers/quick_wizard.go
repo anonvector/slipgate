@@ -54,6 +54,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 		naiveEmail string
 		naiveDecoy string
 		tlsPort    int
+		allowPorts string
 	}
 	var allSettings []transportSettings
 
@@ -72,6 +73,10 @@ func handleQuickWizard(ctx *actions.Context) error {
 			case config.TransportSOCKS:
 				backend = config.BackendSOCKS
 			}
+			backends = []string{backend}
+		} else if tr == config.TransportSoar {
+			// Soar dials client-requested destinations itself
+			backend = config.BackendDirect
 			backends = []string{backend}
 		} else {
 			backend, err = prompt.Select(fmt.Sprintf("Backend for %s", tr), actions.BackendOptions)
@@ -93,6 +98,8 @@ func handleQuickWizard(ctx *actions.Context) error {
 				domainHint = "s.example.com"
 			} else if tr == config.TransportVayDNS {
 				domainHint = "v.example.com"
+			} else if tr == config.TransportSoar {
+				domainHint = "r.example.com"
 			}
 			displayName := tr
 			if tr == config.TransportDNSTT {
@@ -165,6 +172,17 @@ func handleQuickWizard(ctx *actions.Context) error {
 			}
 		}
 
+		var allowPorts string
+		if tr == config.TransportSoar {
+			allowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+			if err != nil {
+				return err
+			}
+			if allowPorts == config.DefaultSoarAllowPorts {
+				allowPorts = ""
+			}
+		}
+
 		allSettings = append(allSettings, transportSettings{
 			transport:  tr,
 			backend:    backend,
@@ -175,6 +193,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 			naiveEmail: naiveEmail,
 			naiveDecoy: naiveDecoy,
 			tlsPort:    tlsPort,
+			allowPorts: allowPorts,
 		})
 	}
 
@@ -270,7 +289,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 	// Firewall
 	for _, s := range allSettings {
 		switch s.transport {
-		case config.TransportDNSTT, config.TransportSlipstream, config.TransportVayDNS:
+		case config.TransportDNSTT, config.TransportSlipstream, config.TransportVayDNS, config.TransportSoar:
 			_ = network.AllowPort(53, "udp")
 			_ = network.AllowPort(53, "tcp")
 			_ = network.DisableResolvedStub()
@@ -433,6 +452,20 @@ func handleQuickWizard(ctx *actions.Context) error {
 					Cert: certPath,
 					Key:  keyPath,
 				}
+
+			case config.TransportSoar:
+				privKeyPath := filepath.Join(tunnelDir, "server.key")
+				out.Info(fmt.Sprintf("Generating Ed25519 keypair for %s...", tunnelDomain))
+				pubKey, err := keys.GenerateSoarKeys(privKeyPath, filepath.Join(tunnelDir, "server.pub"))
+				if err != nil {
+					return actions.NewError(actions.QuickWizard, "key generation failed", err)
+				}
+				tunnel.Soar = &config.SoarConfig{
+					PrivateKey: privKeyPath,
+					PublicKey:  pubKey,
+					AllowPorts: s.allowPorts,
+				}
+				out.Success(fmt.Sprintf("Public key: %s", pubKey))
 
 			case config.TransportStunTLS:
 				certPath := filepath.Join(tunnelDir, "cert.pem")
@@ -644,6 +677,7 @@ func handleQuickWizard(ctx *actions.Context) error {
 			}
 		}
 	}
+	printSoarClients(out, allTunnels)
 
 	out.Print("  ══════════════════════════════════════════════════════")
 	out.Print("")
