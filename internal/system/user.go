@@ -134,16 +134,23 @@ func GeneratePassword(length int) string {
 	return string(result)
 }
 
-func ensureSSHMatchGroup() error {
-	const globalSettings = `
+const sshGlobalSettings = `
 # SlipGate global SSH settings
 MaxStartups 100:30:300
 MaxSessions 100
 TCPKeepAlive no
 `
-	const matchBlock = `
+
+// sshMatchBlock configures the tunnel users. They log in with passwords,
+// which many images turn off globally (e.g. cloud-init's
+// PasswordAuthentication no, or AuthenticationMethods publickey), so the
+// block turns them back on for this group alone; other accounts keep the
+// server's own rules.
+const sshMatchBlock = `
 # SlipGate SSH tunnel users
 Match Group slipgate-ssh
+    PasswordAuthentication yes
+    AuthenticationMethods any
     AllowTcpForwarding yes
     X11Forwarding no
     AllowAgentForwarding no
@@ -151,63 +158,64 @@ Match Group slipgate-ssh
     ClientAliveInterval 30
     ClientAliveCountMax 10
 `
-	data, err := os.ReadFile("/etc/ssh/sshd_config")
-	if err != nil {
-		return err
-	}
 
-	content := string(data)
-	changed := false
+// EnsureSSHConfig brings sshd_config's SlipGate settings up to date, e.g.
+// after an update changes them.
+func EnsureSSHConfig() error {
+	return ensureSSHMatchGroup()
+}
 
-	// Ensure global settings are present (must be before any Match block)
+// withSlipgateSSHConfig returns sshd_config content with SlipGate's global
+// settings and its current Match block.
+func withSlipgateSSHConfig(content string) string {
+	// Global settings must come before any Match block
 	if !strings.Contains(content, "# SlipGate global SSH settings") {
 		// Insert before the first Match block or SlipGate block, or append
 		if idx := strings.Index(content, "# SlipGate SSH tunnel users"); idx >= 0 {
-			content = content[:idx] + globalSettings + "\n" + content[idx:]
+			content = content[:idx] + sshGlobalSettings + "\n" + content[idx:]
 		} else if idx := strings.Index(content, "\nMatch "); idx >= 0 {
-			content = content[:idx] + globalSettings + content[idx:]
+			content = content[:idx] + sshGlobalSettings + content[idx:]
 		} else {
-			content += globalSettings
-		}
-		changed = true
-	}
-
-	// If the Match block exists but lacks keepalive settings, replace it
-	if strings.Contains(content, "Match Group slipgate-ssh") {
-		if strings.Contains(content, "ClientAliveInterval") && !changed {
-			return nil // already up to date
-		}
-		// Remove the old Match block and fall through to re-append
-		if idx := strings.Index(content, "# SlipGate SSH tunnel users"); idx >= 0 {
-			content = strings.TrimRight(content[:idx], "\n") + "\n"
-			changed = true
-		} else if !changed {
-			return nil // can't safely remove, skip
+			content += sshGlobalSettings
 		}
 	}
 
-	if changed {
-		if err := os.WriteFile("/etc/ssh/sshd_config", []byte(content), 0644); err != nil {
-			return err
-		}
+	if strings.Contains(content, sshMatchBlock) {
+		return content // already up to date
+	}
+	// Replace an older SlipGate block, which is always last in the file
+	if idx := strings.Index(content, "# SlipGate SSH tunnel users"); idx >= 0 {
+		content = strings.TrimRight(content[:idx], "\n") + "\n"
+	} else if strings.Contains(content, "Match Group slipgate-ssh") {
+		return content // a block we didn't write: can't safely replace it
+	}
+	return content + sshMatchBlock
+}
+
+func ensureSSHMatchGroup() error {
+	const path = "/etc/ssh/sshd_config"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	content := withSlipgateSSHConfig(string(data))
+	if content == string(data) {
+		return nil
 	}
 
-	// Append Match block if not present
-	if !strings.Contains(content, "Match Group slipgate-ssh") {
-		f, err := os.OpenFile("/etc/ssh/sshd_config", os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		if _, err := f.WriteString(matchBlock); err != nil {
-			return err
-		}
+	// Validate before replacing the live config: an sshd_config that fails
+	// to parse stops sshd from starting and locks out the server.
+	tmp := path + ".slipgate-new"
+	if err := os.WriteFile(tmp, []byte(content), 0644); err != nil {
+		return err
 	}
-
-	// Validate config before restarting
-	if err := run("sshd", "-t"); err != nil {
+	if err := run("sshd", "-t", "-f", tmp); err != nil {
+		os.Remove(tmp)
 		return fmt.Errorf("sshd config validation failed: %w", err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
 	}
 
 	// Try reload first, fall back to restart (needed on Ubuntu 24.04+ with socket activation)

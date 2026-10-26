@@ -13,6 +13,7 @@ import (
 	"github.com/anonvector/slipgate/internal/network"
 	"github.com/anonvector/slipgate/internal/proxy"
 	"github.com/anonvector/slipgate/internal/service"
+	"github.com/anonvector/slipgate/internal/system"
 	"github.com/anonvector/slipgate/internal/transport"
 	"github.com/anonvector/slipgate/internal/version"
 	"github.com/anonvector/slipgate/internal/warp"
@@ -171,6 +172,14 @@ func runPostUpdate(ctx *actions.Context) error {
 				out.Warning("Failed to open port 53/tcp: " + err.Error())
 			}
 			break
+		}
+	}
+
+	// Bring the SSH tunnel users' sshd settings up to date (e.g. password
+	// logins on images that turn them off globally)
+	if len(cfg.Users) > 0 {
+		if err := system.EnsureSSHConfig(); err != nil {
+			out.Warning("Failed to update SSH settings: " + err.Error())
 		}
 	}
 
