@@ -2,11 +2,13 @@ package binary
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -73,9 +75,12 @@ func latestDevTag() string {
 	return ""
 }
 
-// binaryURLTemplates returns download URL templates for transport binaries.
-// Transport binaries always come from the latest stable release regardless
-// of dev/stable channel — they are not included in dev pre-releases.
+// errNotFound marks a release asset that doesn't exist.
+var errNotFound = errors.New("HTTP 404")
+
+// binaryURLTemplates returns download URL templates for transport binaries
+// in the latest stable release, which carries them all. Dev builds try the
+// latest dev release first (see EnsureInstalled).
 func binaryURLTemplates() map[string]string {
 	return map[string]string{
 		"dnstt-server":      stableDownloadBase + "/dnstt-server-%s-%s",
@@ -104,9 +109,26 @@ func EnsureInstalled(name string) error {
 		return fmt.Errorf("unknown binary: %s", name)
 	}
 
-	url := fmt.Sprintf(urlTemplate, runtime.GOOS, runtime.GOARCH)
-	if err := downloadTo(url, binPath, 0755); err != nil {
-		return fmt.Errorf("download %s from %s: %w", name, url, err)
+	stableURL := fmt.Sprintf(urlTemplate, runtime.GOOS, runtime.GOARCH)
+	urls := []string{stableURL}
+	// Dev builds take a transport binary from the latest dev release when
+	// it carries one (e.g. a newer caddy-naive under test), else from stable.
+	if version.ReleaseTag != "" {
+		if tag := latestDevTag(); tag != "" {
+			urls = []string{releaseBaseURL + "/download/" + tag + "/" + path.Base(stableURL), stableURL}
+		}
+	}
+
+	var err error
+	for _, url := range urls {
+		// Fall back only when the asset is missing, so a failed download
+		// never silently installs an older binary
+		if err = downloadTo(url, binPath, 0755); !errors.Is(err, errNotFound) {
+			break
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("download %s: %w", name, err)
 	}
 	return nil
 }
@@ -243,6 +265,9 @@ func downloadToWriter(url string, w io.Writer) error {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("download %s: %w", url, errNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download %s: HTTP %d", url, resp.StatusCode)
 	}
