@@ -33,6 +33,7 @@ func handleSystemUsers(ctx *actions.Context) error {
 			{Value: "edit_password", Label: "Edit user password"},
 			{Value: "remove", Label: "Remove user"},
 			{Value: "list", Label: "List users & configs"},
+			{Value: "configs", Label: "Show all configs (every tunnel and user)"},
 		})
 		if err != nil {
 			return err
@@ -40,9 +41,15 @@ func handleSystemUsers(ctx *actions.Context) error {
 	}
 
 	switch action {
+	case "configs":
+		out.Print("")
+		if printClientConfigs(cfg, out, cfg.Tunnels) == 0 {
+			out.Info("No tunnels with SlipNet configs. Run 'slipgate tunnel add' to create one.")
+		}
+
 	case "list":
 		if len(cfg.Users) == 0 {
-			out.Info("No users configured. Run 'slipgate users add' to create one.")
+			out.Info("No users configured. Run 'slipgate users add' to create one, or 'slipgate users configs' for configs that need no login.")
 			return nil
 		}
 

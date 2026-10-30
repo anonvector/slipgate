@@ -36,6 +36,7 @@ func init() {
 				{Value: "edit_password", Label: "Edit user password"},
 				{Value: "remove", Label: "Remove user"},
 				{Value: "list", Label: "List users"},
+				{Value: "configs", Label: "Show all configs (every tunnel and user)"},
 			}},
 			{Key: "username", Label: "Username", DependsOn: "action", DependsOnValues: []string{"add", "edit_password", "remove"}},
 			{Key: "password", Label: "New password (leave blank to generate)", DependsOn: "action", DependsOnValues: []string{"edit_password"}},

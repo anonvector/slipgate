@@ -803,53 +803,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 	// Show slipnet:// configs
 	out.Print("    Client Configs:")
 	out.Print("")
-	users := cfg.Users
-	if len(users) == 0 {
-		// Show configs without credentials when no user was created
-		users = []config.UserConfig{{}}
-	}
-	for _, u := range users {
-		for _, t := range allTunnels {
-			for _, v := range naiveAwareVariants(&t) {
-				backendCfg := cfg.GetBackend(v.backend)
-				if backendCfg == nil {
-					continue
-				}
-				variantTunnel := t
-				variantTunnel.Backend = v.backend
-				variantTunnel.Tag = v.tag
-
-				modes := []string{""}
-				if t.Transport == config.TransportDNSTT {
-					modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
-				}
-
-				for _, mode := range modes {
-					opts := clientcfg.URIOptions{
-						ClientMode: mode,
-						Username:   u.Username,
-						Password:   u.Password,
-					}
-					uri, err := clientcfg.GenerateURI(&variantTunnel, backendCfg, cfg, opts)
-					if err != nil {
-						continue
-					}
-					label := variantTunnel.Tag
-					if mode == clientcfg.ClientModeNoizDNS {
-						label = strings.ReplaceAll(label, "dnstt", "noizdns")
-					}
-					if u.Username != "" {
-						out.Print(fmt.Sprintf("    [%s] %s", label, u.Username))
-					} else {
-						out.Print(fmt.Sprintf("    [%s] (no auth)", label))
-					}
-					out.Print(fmt.Sprintf("    %s", uri))
-					out.Print("")
-				}
-			}
-		}
-	}
-	printSoarLinks(cfg, out, allTunnels)
+	printClientConfigs(cfg, out, allTunnels)
 
 	out.Print("  ══════════════════════════════════════════════════════")
 	out.Print("")
@@ -887,11 +841,69 @@ func naiveAwareVariants(t *config.TunnelConfig) []naiveURIVariant {
 	}
 }
 
+// printClientConfigs prints every slipnet:// config of the given tunnels:
+// one per user for tunnels with a login (one without credentials when there
+// are no users), then the login-free Soar configs. It returns how many it
+// printed.
+func printClientConfigs(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) int {
+	printed := 0
+	users := cfg.Users
+	if len(users) == 0 {
+		// Show configs without credentials when no user was created
+		users = []config.UserConfig{{}}
+	}
+	for _, u := range users {
+		for _, t := range tunnels {
+			for _, v := range naiveAwareVariants(&t) {
+				backendCfg := cfg.GetBackend(v.backend)
+				if backendCfg == nil {
+					continue
+				}
+				variantTunnel := t
+				variantTunnel.Backend = v.backend
+				variantTunnel.Tag = v.tag
+
+				modes := []string{""}
+				if t.Transport == config.TransportDNSTT {
+					modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
+				}
+
+				for _, mode := range modes {
+					opts := clientcfg.URIOptions{
+						ClientMode: mode,
+						Username:   u.Username,
+						Password:   u.Password,
+					}
+					uri, err := clientcfg.GenerateURI(&variantTunnel, backendCfg, cfg, opts)
+					if err != nil {
+						continue
+					}
+					label := variantTunnel.Tag
+					if mode == clientcfg.ClientModeNoizDNS {
+						label = strings.ReplaceAll(label, "dnstt", "noizdns")
+					}
+					if u.Username != "" {
+						out.Print(fmt.Sprintf("    [%s] %s", label, u.Username))
+					} else {
+						out.Print(fmt.Sprintf("    [%s] (no auth)", label))
+					}
+					out.Print(fmt.Sprintf("    %s", uri))
+					out.Print("")
+					printed++
+				}
+			}
+		}
+	}
+	return printed + printSoarLinks(cfg, out, tunnels)
+}
+
 // printSoarLinks prints, for each direct-backend Soar tunnel, its SlipNet
 // config and the zone and key other Soar clients (e.g. Lantern) need. Those
 // tunnels have no login, so one config serves everyone; Soar+SSH configs
 // carry a user's login and are printed per user like other SSH tunnels.
-func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) {
+// It returns how many configs it printed.
+func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) int {
+	printed := 0
 	for i := range tunnels {
 		t := &tunnels[i]
 		if t.Transport != config.TransportSoar || t.Backend != config.BackendDirect || t.Soar == nil {
@@ -900,10 +912,12 @@ func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []conf
 		out.Print(fmt.Sprintf("    [%s] (no login)", t.Tag))
 		if uri, err := clientcfg.GenerateURI(t, nil, cfg, clientcfg.URIOptions{}); err == nil {
 			out.Print(fmt.Sprintf("    %s", uri))
+			printed++
 		}
 		out.Print(fmt.Sprintf("    Other Soar clients: zone %s, server key %s", t.Domain, t.Soar.PublicKey))
 		out.Print("")
 	}
+	return printed
 }
 
 // baseDomain extracts the parent domain from a subdomain.

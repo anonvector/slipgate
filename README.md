@@ -86,6 +86,7 @@ slipgate users add              # Add a single user
 slipgate users bulk_add         # Add multiple users in one batch (random creds, up to 500)
 slipgate users remove           # Remove a user
 slipgate users list             # List users and their per-tunnel configs
+slipgate users configs          # Show every slipnet:// config (all tunnels and users, incl. no-login Soar)
 slipgate stats                  # Live dashboard (CPU, RAM, traffic, connections, tunnels)
 slipgate diag                   # Run diagnostics (services, ports, keys, DNS, boot status)
 slipgate mtu [value]            # Set MTU for all DNSTT/NoizDNS/VayDNS tunnels at once
@@ -364,9 +365,15 @@ sudo slipgate tunnel share mytunnel
 
 This outputs a `slipnet://` URI that can be scanned or imported into the SlipNet Android app. For DNSTT tunnels, you'll be asked to choose between a DNSTT or NoizDNS client profile — both connect to the same server, but NoizDNS profiles enable DPI evasion on the client side.
 
+To print every config at once, for all tunnels and users (also in the menu under **Users → Show all configs**):
+
+```bash
+sudo slipgate users configs
+```
+
 ### User Model
 
-Users are **global**, not scoped to specific tunnels or transports. `slipgate users add` only asks for a username and password — the protocol is a property of the tunnel, chosen at `tunnel add` time. Every user can authenticate against every tunnel using the same credentials, and `slipgate users list` prints one config block per (user × tunnel) pair. The client picks which tunnel to use by importing the matching `slipnet://` URI.
+Users are **global**, not scoped to specific tunnels or transports. `slipgate users add` only asks for a username and password — the protocol is a property of the tunnel, chosen at `tunnel add` time. Every user can authenticate against every tunnel using the same credentials, and `slipgate users list` prints one config block per (user × tunnel) pair. `slipgate users configs` prints them all at once, together with the configs that need no login (Soar with the direct backend), which belong to no user. The client picks which tunnel to use by importing the matching `slipnet://` URI.
 
 ## File Locations
 
