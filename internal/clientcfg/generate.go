@@ -55,7 +55,9 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	fields[FSSHEnabled] = "0"
 	fields[FSSHPort] = "22"
 	fields[FFwdDNSThroughSSH] = "0"
-	fields[FSSHHost] = getServerIP()
+	// Through a tunnel the server dials the SSH host itself (e.g. NaiveProxy
+	// CONNECTs to it), so its own IP always works there
+	fields[FSSHHost] = localIP()
 	fields[FUseServerDNS] = "0"
 	fields[FDNSTransport] = "udp"
 	fields[FSSHAuthType] = "password"
@@ -108,6 +110,13 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	// v29 defaults: resolver discovery off, TCP/53 paths on demand
 	fields[FSoarDiscovery] = "0"
 	fields[FSoarTCPMode] = "auto"
+
+	// Clients reach these at the server's address, which must be public
+	if tunnel.ConnectsByAddress() {
+		addr, _ := ServerAddress(cfg)
+		fields[FDomain] = addr
+		fields[FSSHHost] = addr
+	}
 
 	// Transport-specific
 	switch tunnel.Transport {
@@ -176,16 +185,11 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 			// Default to WebSocket (most compatible with CDNs and restrictive firewalls).
 			// Only set WebSocket fields — don't also set sshTlsEnabled, which is
 			// a Direct-mode flag and would be dead weight.
-			fields[FDomain] = getServerIP()
 			fields[FSSHPort] = fmt.Sprintf("%d", tunnel.StunTLS.Port)
 			fields[FSSHWsEnabled] = "1"
 			fields[FSSHWsUseTls] = "1"
 			fields[FSSHWsPath] = "/"
 		}
-
-	case config.TransportSSH, config.TransportSOCKS:
-		// Direct transports have no domain — use server IP
-		fields[FDomain] = getServerIP()
 	}
 
 	// User credentials — always populate both SOCKS and SSH fields
@@ -215,7 +219,7 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 			}
 		}
 		if fields[FSSHHost] == "" {
-			fields[FSSHHost] = getServerIP()
+			fields[FSSHHost] = localIP()
 		}
 	}
 
@@ -240,14 +244,4 @@ func durationToSeconds(d string) string {
 		return "0"
 	}
 	return fmt.Sprintf("%d", int(dur.Seconds()))
-}
-
-func getServerIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return ""
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String()
 }

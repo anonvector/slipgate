@@ -111,6 +111,7 @@ slipgate router switch          # Change active tunnel (single mode)
 # Configuration
 slipgate config export          # Print config.json (no keys; use backup to move a server)
 slipgate config import [path]   # Replace config.json (no keys)
+slipgate config address [ip]    # Public IP or hostname for StunTLS/SSH/SOCKS5 configs ("auto" to detect)
 
 # Internal (used by systemd services)
 slipgate dnsrouter serve        # Start DNS router
@@ -370,6 +371,17 @@ To print every config at once, for all tunnels and users (also in the menu under
 ```bash
 sudo slipgate users configs
 ```
+
+### Server address (Oracle, AWS, GCP, Azure)
+
+StunTLS, direct SSH and direct SOCKS5 configs carry the server's IP, since clients connect to it directly. Cloud servers only see a private IP (e.g. `10.0.0.5`) on their network interface, so slipgate looks for the public one: the server's own IP when it is public, otherwise the IP that `ns.<your domain>` or a NaiveProxy domain points at. If it finds none, it asks once and saves the answer. Set or change it at any time (also in the menu under **Tunnels → Server address**):
+
+```bash
+sudo slipgate config address 203.0.113.7   # an IP or hostname, without a port
+sudo slipgate config address auto          # detect it again
+```
+
+Configs for DNS tunnels, Soar and NaiveProxy connect by domain and don't depend on it.
 
 ### User Model
 

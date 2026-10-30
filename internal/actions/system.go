@@ -111,4 +111,13 @@ func init() {
 			{Key: "path", Label: "Config file path", Required: true},
 		},
 	})
+
+	Register(&Action{
+		ID:       ConfigAddress,
+		Name:     "Server address for client configs",
+		Category: "config",
+		Inputs: []InputField{
+			{Key: "address", Label: `Public IP or hostname ("auto" to detect)`, CLIOnly: true},
+		},
+	})
 }

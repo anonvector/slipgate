@@ -589,6 +589,7 @@ func addSingleTunnel(ctx *actions.Context, cfg *config.Config, transport_, backe
 		out.Success(fmt.Sprintf("Tunnel %q created — DNS queries for %s will route to 127.0.0.1:%d", tag, domain, tunnel.Port))
 	} else {
 		out.Success(fmt.Sprintf("Tunnel %q created and started", tag))
+		ensureServerAddress(cfg, out, []config.TunnelConfig{tunnel})
 		if transport_ == config.TransportSoar && backend == config.BackendDirect {
 			// No login, so one config serves everyone: show it now
 			out.Print("")

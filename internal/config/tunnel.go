@@ -164,6 +164,16 @@ func (t *TunnelConfig) HasManagedService() bool {
 	return t.IsDNSTunnel() && t.Transport != TransportExternal
 }
 
+// ConnectsByAddress reports whether clients reach this tunnel at the
+// server's address rather than through a domain.
+func (t *TunnelConfig) ConnectsByAddress() bool {
+	switch t.Transport {
+	case TransportSSH, TransportSOCKS, TransportStunTLS:
+		return true
+	}
+	return false
+}
+
 // IsDirectTransport returns true for transports that expose a service directly (no tunnel).
 func (t *TunnelConfig) IsDirectTransport() bool {
 	switch t.Transport {

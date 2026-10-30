@@ -179,6 +179,7 @@ func tunnelMenu(cfg *config.Config) error {
 	fmt.Println("  7) View logs")
 	fmt.Println("  8) Remove tunnel")
 	fmt.Println("  9) Set MTU (DNSTT/NoizDNS/VayDNS)")
+	fmt.Println(" 10) Server address (for client configs)")
 	fmt.Println("  0) Back")
 	fmt.Print("\n  Choice: ")
 
@@ -215,6 +216,11 @@ func tunnelMenu(cfg *config.Config) error {
 		return runAction(actions.TunnelRemove, cfg)
 	case "9":
 		if err := runAction(actions.SystemMTU, cfg); err != nil {
+			return err
+		}
+		waitForEnter()
+	case "10":
+		if err := runAction(actions.ConfigAddress, cfg); err != nil {
 			return err
 		}
 		waitForEnter()

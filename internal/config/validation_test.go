@@ -54,6 +54,7 @@ func TestValidateImportedRejectsInjection(t *testing.T) {
 		"port out of range":         func(c *Config) { c.Tunnels[0].Port = 70000 },
 		"transport settings absent": func(c *Config) { c.Tunnels[0].DNSTT = nil },
 		"control char anywhere":     func(c *Config) { c.Route.Default = "dnstt\x00" },
+		"public address with port":  func(c *Config) { c.PublicAddress = "203.0.113.7:22" },
 	}
 	for name, mutate := range cases {
 		c := importable()

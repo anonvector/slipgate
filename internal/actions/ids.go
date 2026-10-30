@@ -34,6 +34,7 @@ const (
 	WarpToggle = "warp.toggle"
 
 	// Config actions
-	ConfigExport = "config.export"
-	ConfigImport = "config.import"
+	ConfigExport  = "config.export"
+	ConfigImport  = "config.import"
+	ConfigAddress = "config.address"
 )

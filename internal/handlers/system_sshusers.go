@@ -405,6 +405,7 @@ func nextUsernameIndex(cfg *config.Config, prefix string) int {
 }
 
 func showUserConfigs(cfg *config.Config, username, password string, out actions.OutputWriter) {
+	ensureServerAddress(cfg, out, cfg.Tunnels)
 	for _, t := range cfg.Tunnels {
 		backend := cfg.GetBackend(t.Backend)
 		if backend == nil {

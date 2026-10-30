@@ -750,6 +750,8 @@ func handleSystemInstall(ctx *actions.Context) error {
 		}
 	}
 
+	ensureServerAddress(cfg, out, allTunnels)
+
 	// ── Step 7: Summary ────────────────────────────────────────────
 	out.Print("")
 	out.Print("  ══════════════════════════════════════════════════════")
@@ -846,6 +848,7 @@ func naiveAwareVariants(t *config.TunnelConfig) []naiveURIVariant {
 // are no users), then the login-free Soar configs. It returns how many it
 // printed.
 func printClientConfigs(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) int {
+	ensureServerAddress(cfg, out, tunnels)
 	printed := 0
 	users := cfg.Users
 	if len(users) == 0 {
@@ -923,45 +926,7 @@ func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []conf
 // baseDomain extracts the parent domain from a subdomain.
 // e.g. "t.example.com" → "example.com"
 func baseDomain(domain string) string {
-	parts := splitDomain(domain)
-	if len(parts) <= 2 {
-		return domain
-	}
-	return joinDomain(parts[1:])
-}
-
-func splitDomain(d string) []string {
-	var parts []string
-	for _, p := range splitBy(d, '.') {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	return parts
-}
-
-func splitBy(s string, sep byte) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep {
-			parts = append(parts, s[start:i])
-			start = i + 1
-		}
-	}
-	parts = append(parts, s[start:])
-	return parts
-}
-
-func joinDomain(parts []string) string {
-	result := ""
-	for i, p := range parts {
-		if i > 0 {
-			result += "."
-		}
-		result += p
-	}
-	return result
+	return config.ParentDomain(domain)
 }
 
 func copyFile(src, dst string) error {

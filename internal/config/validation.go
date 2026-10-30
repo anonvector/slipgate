@@ -177,6 +177,11 @@ func (c *Config) ValidateImported() error {
 			return fmt.Errorf("listen address: %w", err)
 		}
 	}
+	if c.PublicAddress != "" {
+		if err := ValidatePublicAddress(c.PublicAddress); err != nil {
+			return fmt.Errorf("public address: %w", err)
+		}
+	}
 	for _, b := range c.Backends {
 		if err := validateTag(b.Tag); err != nil {
 			return fmt.Errorf("backend %q: %w", b.Tag, err)
@@ -352,6 +357,15 @@ func rejectControlChars(c *Config) error {
 		return nil
 	}
 	return walk("", tree)
+}
+
+// ValidatePublicAddress checks the address client configs use to reach the
+// server: an IP or a hostname, without a port.
+func ValidatePublicAddress(addr string) error {
+	if net.ParseIP(addr) != nil || domainRegex.MatchString(addr) {
+		return nil
+	}
+	return fmt.Errorf("invalid address %q: give an IP or hostname, without a port", addr)
 }
 
 // validateAddr checks a host:port value that is passed on a command line.

@@ -40,6 +40,7 @@ func handleTunnelShare(ctx *actions.Context) error {
 	if backend == nil {
 		return actions.NewError(actions.TunnelShare, "backend not found", nil)
 	}
+	ensureServerAddress(cfg, ctx.Output, []config.TunnelConfig{*tunnel})
 
 	opts := clientcfg.URIOptions{}
 

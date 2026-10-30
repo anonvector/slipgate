@@ -134,8 +134,9 @@ func registerActionCommands() {
 	}
 
 	configActions := map[string]string{
-		actions.ConfigExport: "export",
-		actions.ConfigImport: "import",
+		actions.ConfigExport:  "export",
+		actions.ConfigImport:  "import",
+		actions.ConfigAddress: "address",
 	}
 	for id, use := range configActions {
 		a, ok := actions.Get(id)

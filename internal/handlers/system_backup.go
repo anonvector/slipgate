@@ -240,11 +240,14 @@ func handleSystemRestore(ctx *actions.Context) error {
 
 	out.Print("")
 	out.Success(fmt.Sprintf("Restore complete: %d tunnel(s), %d user(s)", len(cfg.Tunnels), len(cfg.Users)))
-	if records := dnsRecordsToMove(cfg); len(records) > 0 {
+	if records := cfg.ServerHostnames(); len(records) > 0 {
 		out.Info("Point these DNS records at this server's IP; clients then work unchanged (same keys and passwords):")
 		for _, r := range records {
 			out.Print("      A  record: " + r)
 		}
+	}
+	if cfg.PublicAddress != "" {
+		out.Info(fmt.Sprintf("Client configs use the backup's public address %s. If this server's differs, change it with: sudo slipgate config address", cfg.PublicAddress))
 	}
 	return nil
 }
@@ -429,32 +432,6 @@ func setupSOCKS(cfg *config.Config) error {
 		return proxy.SetupSOCKSWithUsers(cfg.Users)
 	}
 	return proxy.SetupSOCKS()
-}
-
-// dnsRecordsToMove lists the A records that must point at the server for
-// cfg's tunnels: ns.<parent> for DNS tunnels, the domain itself for
-// NaiveProxy.
-func dnsRecordsToMove(cfg *config.Config) []string {
-	seen := make(map[string]bool)
-	var records []string
-	for _, t := range cfg.Tunnels {
-		var r string
-		switch {
-		case t.Domain == "":
-			continue
-		case t.Transport == config.TransportNaive:
-			r = t.Domain
-		case t.IsDNSTunnel():
-			r = "ns." + baseDomain(t.Domain)
-		default:
-			continue
-		}
-		if !seen[r] {
-			seen[r] = true
-			records = append(records, r)
-		}
-	}
-	return records
 }
 
 // defaultBackupPath returns a timestamped file name in the home directory.

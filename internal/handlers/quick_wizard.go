@@ -597,6 +597,8 @@ func handleQuickWizard(ctx *actions.Context) error {
 		}
 	}
 
+	ensureServerAddress(cfg, out, allTunnels)
+
 	// ── Summary ────────────────────────────────────────────────
 	out.Print("")
 	out.Print("  ══════════════════════════════════════════════════════")

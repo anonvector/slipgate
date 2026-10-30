@@ -49,4 +49,5 @@ func init() {
 	register(actions.WarpToggle, handleWarp)
 	register(actions.ConfigExport, handleConfigExport)
 	register(actions.ConfigImport, handleConfigImport)
+	register(actions.ConfigAddress, handleConfigAddress)
 }
