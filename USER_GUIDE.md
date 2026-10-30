@@ -156,6 +156,8 @@ slipgate install                Install dependencies, set up server
 slipgate uninstall              Remove everything
 slipgate update                 Self-update + restart services
 slipgate restart                Restart all services
+slipgate backup [file]          Back up config, keys and users (file or copy-paste text)
+slipgate restore [file]         Restore a backup on this server
 slipgate users                  Add / list / remove users (interactive)
 slipgate users add              Add one user
 slipgate users bulk_add         Add many users with random passwords
@@ -178,8 +180,8 @@ slipgate router status          DNS routing config
 slipgate router mode            Switch single ↔ multi mode
 slipgate router switch          Change active tunnel (single mode)
 
-slipgate config export          Export full config (JSON)
-slipgate config import          Import config back in
+slipgate config export          Print config.json (no keys; use backup to move a server)
+slipgate config import [path]   Replace config.json (no keys)
 ```
 
 ---
@@ -433,26 +435,34 @@ The update is in-place — your tunnels, users, and keys are untouched. Existing
 
 ## 15. Backup & migration
 
-**Export** your full config (tunnels, users, keys, certs):
+A backup holds everything needed to run your setup on another server: the config, every tunnel's private keys and certificates, and all users with their passwords. Restoring it on a new server brings back the same tunnels with the same keys, so clients keep working without new `slipnet://` URIs.
+
+**Make a backup** (menu → 10 Backup / Restore, or):
 
 ```bash
-sudo slipgate config export > slipgate-backup.json
+sudo slipgate backup                              # asks: save to a file, or print as text to copy
+sudo slipgate backup /root/slipgate-backup.txt
 ```
 
-Save this somewhere safe (your laptop, encrypted backup).
+The backup is one block of text between a `-----BEGIN SLIPGATE BACKUP-----` and an `-----END SLIPGATE BACKUP-----` line, so you can keep it as a file or copy-paste it. It contains every private key and password: keep it private.
 
 **Restore on a new server:**
 
+1. Install SlipGate (`curl ... | sudo bash`). When the install wizard asks which transports to install, press Ctrl-C: the restore sets them up.
+2. Run `sudo slipgate restore` and paste the text, or give the file: `sudo slipgate restore /root/slipgate-backup.txt`.
+3. Point the DNS records at the new server's IP. Restore lists the ones to change (`ns.<your domain>`, and the domain of any NaiveProxy tunnel).
+
+Restore installs the transport binaries, writes the keys and config, creates the users, opens the firewall ports, sets up WARP if it was on (with a new WARP account), and starts every service. If the server already has tunnels or users, they are replaced; the current setup is first saved to `/root/slipgate-pre-restore-<date>.txt`, which can be restored the same way.
+
+Straight from one server to another:
+
 ```bash
-sudo slipgate install
-sudo slipgate config import < slipgate-backup.json
+ssh root@old-server slipgate backup - | ssh root@new-server slipgate restore - --yes
 ```
 
-This is also how you migrate to a new VPS without breaking client URIs:
-1. Spin up a new VPS.
-2. Update your domain's `A` record to the new IP.
-3. Install SlipGate on the new VPS and import the backup.
-4. Existing `slipnet://` URIs keep working — same keys, same domain.
+`-` writes the backup to stdout or reads it from stdin; `--yes` skips the confirmation question, which needs a terminal.
+
+`slipgate config export` prints only `config.json`, without keys. Use `backup` to move a server.
 
 ---
 
@@ -688,6 +698,8 @@ slipgate install                نصب وابستگی‌ها و راه‌اند�
 slipgate uninstall              حذف همه‌چیز
 slipgate update                 خود-آپدیت + ری‌استارت سرویس‌ها
 slipgate restart                ری‌استارت همه سرویس‌ها
+slipgate backup [file]          بکاپ کانفیگ، کلیدها و کاربران (فایل یا متن برای کپی‌پیست)
+slipgate restore [file]         ریستور بکاپ روی این سرور
 slipgate users                  افزودن / لیست / حذف کاربر (تعاملی)
 slipgate users add              افزودن یک کاربر
 slipgate users bulk_add         افزودن گروهی با پسورد تصادفی
@@ -710,8 +722,8 @@ slipgate router status          وضعیت روتر DNS
 slipgate router mode            تعویض single ↔ multi
 slipgate router switch          تغییر تونل فعال (single mode)
 
-slipgate config export          خروجی کامل کانفیگ (JSON)
-slipgate config import          ایمپورت دوباره
+slipgate config export          چاپ config.json (بدون کلیدها؛ برای انتقال سرور از backup استفاده کنید)
+slipgate config import [path]   جایگزینی config.json (بدون کلیدها)
 ```
 
 ---
@@ -965,26 +977,34 @@ sudo slipgate update
 
 ## ۱۵. بکاپ و مهاجرت
 
-**خروجی** کامل کانفیگ (تونل، کاربر، کلید، گواهی):
+بکاپ همه‌ی چیزهایی را که برای اجرای همین تنظیمات روی سرور دیگری لازم است در خود دارد: کانفیگ، کلیدهای خصوصی و گواهی‌های همه‌ی تونل‌ها، و همه‌ی کاربران با رمزهایشان. با ریستور آن روی سرور جدید، همان تونل‌ها با همان کلیدها برمی‌گردند و کلاینت‌ها بدون URI جدید `slipnet://` کار می‌کنند.
+
+**گرفتن بکاپ** (منو ← ۱۰ Backup / Restore، یا):
 
 ```bash
-sudo slipgate config export > slipgate-backup.json
+sudo slipgate backup                              # می‌پرسد: ذخیره در فایل یا چاپ به‌صورت متن برای کپی
+sudo slipgate backup /root/slipgate-backup.txt
 ```
 
-این را در جای امن نگه دارید (لپ‌تاپ، بکاپ رمزشده).
+بکاپ یک بلوک متن بین خط `-----BEGIN SLIPGATE BACKUP-----` و خط `-----END SLIPGATE BACKUP-----` است؛ می‌توانید آن را به‌صورت فایل نگه دارید یا کپی‌پیست کنید. این متن شامل همه‌ی کلیدهای خصوصی و رمزهاست: آن را خصوصی نگه دارید.
 
 **ریستور روی سرور جدید:**
 
+۱. SlipGate را نصب کنید (`curl ... | sudo bash`). وقتی ویزارد نصب پرسید کدام ترنسپورت‌ها نصب شوند، Ctrl-C بزنید؛ ریستور آن‌ها را راه‌اندازی می‌کند.
+۲. `sudo slipgate restore` را اجرا کنید و متن را پیست کنید، یا فایل را بدهید: `sudo slipgate restore /root/slipgate-backup.txt`
+۳. رکوردهای DNS را به IP سرور جدید تغییر دهید. ریستور رکوردهایی را که باید عوض شوند نشان می‌دهد (`ns.<دامنه‌ی شما>` و دامنه‌ی تونل‌های NaiveProxy).
+
+ریستور باینری‌های ترنسپورت را نصب می‌کند، کلیدها و کانفیگ را می‌نویسد، کاربران را می‌سازد، پورت‌های فایروال را باز می‌کند، اگر WARP روشن بوده آن را (با یک اکانت WARP جدید) راه‌اندازی می‌کند و همه‌ی سرویس‌ها را اجرا می‌کند. اگر روی سرور از قبل تونل یا کاربری باشد، جایگزین می‌شود؛ تنظیمات فعلی پیش از آن در `/root/slipgate-pre-restore-<تاریخ>.txt` ذخیره می‌شود و به همین روش قابل ریستور است.
+
+مستقیم از یک سرور به سرور دیگر:
+
 ```bash
-sudo slipgate install
-sudo slipgate config import < slipgate-backup.json
+ssh root@old-server slipgate backup - | ssh root@new-server slipgate restore - --yes
 ```
 
-این روش برای مهاجرت به VPS جدید بدون از کار افتادن URIهای کلاینت عالی است:
-۱. یک VPS جدید بگیرید.
-۲. رکورد `A` دامنه را به IP جدید آپدیت کنید.
-۳. SlipGate را روی VPS جدید نصب کنید و بکاپ را ایمپورت کنید.
-۴. URIهای موجود `slipnet://` کار می‌کنند — همان کلیدها، همان دامنه.
+`-` بکاپ را در stdout می‌نویسد یا از stdin می‌خواند؛ `--yes` سؤال تأیید را رد می‌کند، چون آن سؤال به ترمینال نیاز دارد.
+
+`slipgate config export` فقط `config.json` را بدون کلیدها چاپ می‌کند. برای انتقال سرور از `backup` استفاده کنید.
 
 ---
 

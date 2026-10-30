@@ -27,6 +27,10 @@ func b64(s string) string {
 
 // GenerateURI builds a slipnet:// URI from tunnel + backend config.
 func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg *config.Config, opts URIOptions) (string, error) {
+	if _, ok := TunnelTypeMap[tunnel.Transport]; !ok {
+		return "", fmt.Errorf("client config not supported for %s tunnels", tunnel.Transport)
+	}
+
 	var fields [TotalFields]string
 
 	// Version and type
@@ -51,7 +55,9 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	fields[FSSHEnabled] = "0"
 	fields[FSSHPort] = "22"
 	fields[FFwdDNSThroughSSH] = "0"
-	fields[FSSHHost] = getServerIP()
+	// Through a tunnel the server dials the SSH host itself (e.g. NaiveProxy
+	// CONNECTs to it), so its own IP always works there
+	fields[FSSHHost] = localIP()
 	fields[FUseServerDNS] = "0"
 	fields[FDNSTransport] = "udp"
 	fields[FSSHAuthType] = "password"
@@ -86,6 +92,31 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 	fields[FSSHHttpProxyPort] = "8080"
 	// v22 defaults
 	fields[FSSHPayload] = b64("")
+	// v23-v28 defaults, as the app exports them for a non-VLESS profile
+	fields[FResolverMode] = "roundrobin"
+	fields[FRRSpreadCount] = "3"
+	fields[FVlessSecurity] = "tls"
+	fields[FVlessTransport] = "ws"
+	fields[FVlessWsPath] = "/"
+	fields[FCdnPort] = "443"
+	fields[FSniFragmentEnabled] = "1"
+	fields[FSniFragmentStrategy] = "micro"
+	fields[FSniFragmentDelayMs] = "300"
+	fields[FCHPadding] = "0"
+	fields[FWSHeaderObfuscation] = "1"
+	fields[FWSPadding] = "0"
+	fields[FSniSpoofTTL] = "8"
+	fields[FTCPMaxSeg] = "0"
+	// v29 defaults: resolver discovery off, TCP/53 paths on demand
+	fields[FSoarDiscovery] = "0"
+	fields[FSoarTCPMode] = "auto"
+
+	// Clients reach these at the server's address, which must be public
+	if tunnel.ConnectsByAddress() {
+		addr, _ := ServerAddress(cfg)
+		fields[FDomain] = addr
+		fields[FSSHHost] = addr
+	}
 
 	// Transport-specific
 	switch tunnel.Transport {
@@ -116,6 +147,21 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 			fields[FVayDNSClientIdSize] = fmt.Sprintf("%d", tunnel.VayDNS.ResolvedClientIDSize())
 		}
 
+	case config.TransportSoar:
+		// The Soar tunnel types need a v29 app
+		fields[FVersion] = "29"
+		if tunnel.Soar != nil {
+			fields[FPublicKey] = tunnel.Soar.PublicKey
+		}
+		// Soar+SSH: the Soar server dials the SSH backend itself and allows
+		// that address only, so the app must ask for exactly that address.
+		if tunnel.Backend == config.BackendSSH && backend != nil {
+			if host, port, err := net.SplitHostPort(backend.Address); err == nil {
+				fields[FSSHHost] = host
+				fields[FSSHPort] = port
+			}
+		}
+
 	case config.TransportSlipstream:
 		// No pubkey field needed
 
@@ -139,16 +185,11 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 			// Default to WebSocket (most compatible with CDNs and restrictive firewalls).
 			// Only set WebSocket fields — don't also set sshTlsEnabled, which is
 			// a Direct-mode flag and would be dead weight.
-			fields[FDomain] = getServerIP()
 			fields[FSSHPort] = fmt.Sprintf("%d", tunnel.StunTLS.Port)
 			fields[FSSHWsEnabled] = "1"
 			fields[FSSHWsUseTls] = "1"
 			fields[FSSHWsPath] = "/"
 		}
-
-	case config.TransportSSH, config.TransportSOCKS:
-		// Direct transports have no domain — use server IP
-		fields[FDomain] = getServerIP()
 	}
 
 	// User credentials — always populate both SOCKS and SSH fields
@@ -178,7 +219,7 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 			}
 		}
 		if fields[FSSHHost] == "" {
-			fields[FSSHHost] = getServerIP()
+			fields[FSSHHost] = localIP()
 		}
 	}
 
@@ -188,7 +229,10 @@ func GenerateURI(tunnel *config.TunnelConfig, backend *config.BackendConfig, cfg
 		fields[FNaivePass] = b64(password)
 	}
 
-	return Encode(fields), nil
+	if fields[FVersion] == "29" {
+		return Encode(fields[:]), nil
+	}
+	return Encode(fields[:V22Fields]), nil
 }
 
 func durationToSeconds(d string) string {
@@ -200,14 +244,4 @@ func durationToSeconds(d string) string {
 		return "0"
 	}
 	return fmt.Sprintf("%d", int(dur.Seconds()))
-}
-
-func getServerIP() string {
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return ""
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP.String()
 }

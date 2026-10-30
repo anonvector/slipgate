@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+
 	"github.com/anonvector/slipgate/internal/actions"
 	"github.com/anonvector/slipgate/internal/clientcfg"
 	"github.com/anonvector/slipgate/internal/config"
@@ -21,10 +23,24 @@ func handleTunnelShare(ctx *actions.Context) error {
 			"Run 'slipgate tunnel status' to see available tunnels", nil)
 	}
 
+	// Direct-backend Soar has no login: one config serves everyone
+	if tunnel.Transport == config.TransportSoar && tunnel.Backend == config.BackendDirect {
+		uri, err := clientcfg.GenerateURI(tunnel, nil, cfg, clientcfg.URIOptions{})
+		if err != nil {
+			return actions.NewError(actions.TunnelShare, "failed to generate URI", err)
+		}
+		ctx.Output.Print(uri)
+		if tunnel.Soar != nil {
+			ctx.Output.Info(fmt.Sprintf("Other Soar clients: zone %s, server key %s", tunnel.Domain, tunnel.Soar.PublicKey))
+		}
+		return nil
+	}
+
 	backend := cfg.GetBackend(tunnel.Backend)
 	if backend == nil {
 		return actions.NewError(actions.TunnelShare, "backend not found", nil)
 	}
+	ensureServerAddress(cfg, ctx.Output, []config.TunnelConfig{*tunnel})
 
 	opts := clientcfg.URIOptions{}
 

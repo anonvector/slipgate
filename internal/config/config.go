@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -33,6 +34,9 @@ type Config struct {
 	Users    []UserConfig    `json:"users,omitempty"`
 	Route    RouteConfig     `json:"route"`
 	Warp     WarpConfig      `json:"warp,omitempty"`
+	// PublicAddress is the IP or hostname client configs use to reach this
+	// server; empty means detect it (see clientcfg.ServerAddress).
+	PublicAddress string `json:"public_address,omitempty"`
 }
 
 // UserConfig tracks a managed user (same credentials for SSH + SOCKS).
@@ -180,6 +184,44 @@ func (c *Config) GetBackend(tag string) *BackendConfig {
 		}
 	}
 	return nil
+}
+
+// ServerHostnames returns the DNS names that must point at this server for
+// its tunnels: ns.<parent domain> for DNS tunnels and the domain itself for
+// NaiveProxy.
+func (c *Config) ServerHostnames() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	seen := make(map[string]bool)
+	var names []string
+	for _, t := range c.Tunnels {
+		var name string
+		switch {
+		case t.Domain == "":
+			continue
+		case t.Transport == TransportNaive:
+			name = t.Domain
+		case t.IsDNSTunnel():
+			name = "ns." + ParentDomain(t.Domain)
+		default:
+			continue
+		}
+		if !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	return names
+}
+
+// ParentDomain returns the domain a subdomain belongs to, e.g.
+// "t.example.com" → "example.com". Two-label domains are returned as is.
+func ParentDomain(domain string) string {
+	parts := strings.FieldsFunc(domain, func(r rune) bool { return r == '.' })
+	if len(parts) <= 2 {
+		return domain
+	}
+	return strings.Join(parts[1:], ".")
 }
 
 // GetUser returns a user by username.

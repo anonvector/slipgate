@@ -26,12 +26,15 @@ const (
 	SystemStats     = "system.stats"
 	SystemDiag      = "system.diag"
 	SystemMTU       = "system.mtu"
+	SystemBackup    = "system.backup"
+	SystemRestore   = "system.restore"
 	QuickWizard     = "system.wizard"
 
 	// WARP actions
 	WarpToggle = "warp.toggle"
 
 	// Config actions
-	ConfigExport = "config.export"
-	ConfigImport = "config.import"
+	ConfigExport  = "config.export"
+	ConfigImport  = "config.import"
+	ConfigAddress = "config.address"
 )

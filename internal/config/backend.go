@@ -4,6 +4,9 @@ package config
 const (
 	BackendSOCKS = "socks"
 	BackendSSH   = "ssh"
+	// BackendDirect marks transports that dial client-requested destinations
+	// themselves (Soar) instead of relaying to a SOCKS/SSH backend.
+	BackendDirect = "direct"
 )
 
 // BackendConfig defines a backend service.

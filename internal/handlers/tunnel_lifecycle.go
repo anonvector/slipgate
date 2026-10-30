@@ -122,6 +122,16 @@ func showTunnelDetail(out actions.OutputWriter, tunnel *config.TunnelConfig) {
 				out.Print(fmt.Sprintf("  Priv Key  : %s", privKey))
 			}
 		}
+	case config.TransportSoar:
+		if tunnel.Soar != nil {
+			if tunnel.Backend == config.BackendDirect {
+				out.Print(fmt.Sprintf("  Ports     : %s", tunnel.Soar.ResolvedAllowPorts()))
+			}
+			out.Print(fmt.Sprintf("  Public Key: %s", tunnel.Soar.PublicKey))
+			if privKey := readKeyFile(tunnel.Soar.PrivateKey); privKey != "" {
+				out.Print(fmt.Sprintf("  Priv Key  : %s", privKey))
+			}
+		}
 	case config.TransportNaive:
 		if tunnel.Naive != nil {
 			out.Print(fmt.Sprintf("  Email     : %s", tunnel.Naive.Email))

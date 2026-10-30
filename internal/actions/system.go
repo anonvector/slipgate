@@ -36,6 +36,7 @@ func init() {
 				{Value: "edit_password", Label: "Edit user password"},
 				{Value: "remove", Label: "Remove user"},
 				{Value: "list", Label: "List users"},
+				{Value: "configs", Label: "Show all configs (every tunnel and user)"},
 			}},
 			{Key: "username", Label: "Username", DependsOn: "action", DependsOnValues: []string{"add", "edit_password", "remove"}},
 			{Key: "password", Label: "New password (leave blank to generate)", DependsOn: "action", DependsOnValues: []string{"edit_password"}},
@@ -66,6 +67,25 @@ func init() {
 	})
 
 	Register(&Action{
+		ID:       SystemBackup,
+		Name:     "Backup (config, keys, users)",
+		Category: "system",
+		Inputs: []InputField{
+			{Key: "file", Label: `File to write the backup to ("-" for stdout)`, CLIOnly: true},
+		},
+	})
+
+	Register(&Action{
+		ID:       SystemRestore,
+		Name:     "Restore from backup",
+		Category: "system",
+		Inputs: []InputField{
+			{Key: "file", Label: `Backup file to restore ("-" for stdin)`, CLIOnly: true},
+			{Key: "yes", Label: "Restore without asking for confirmation", CLIOnly: true, Bool: true},
+		},
+	})
+
+	Register(&Action{
 		ID:       QuickWizard,
 		Name:     "Quick Wizard",
 		Category: "system",
@@ -89,6 +109,15 @@ func init() {
 		Category: "config",
 		Inputs: []InputField{
 			{Key: "path", Label: "Config file path", Required: true},
+		},
+	})
+
+	Register(&Action{
+		ID:       ConfigAddress,
+		Name:     "Server address for client configs",
+		Category: "config",
+		Inputs: []InputField{
+			{Key: "address", Label: `Public IP or hostname ("auto" to detect)`, CLIOnly: true},
 		},
 	})
 }

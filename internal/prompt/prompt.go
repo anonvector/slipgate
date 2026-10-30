@@ -1,7 +1,9 @@
 package prompt
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -27,6 +29,29 @@ func String(label, defaultVal string) (string, error) {
 		return defaultVal, nil
 	}
 	return line, nil
+}
+
+// Lines reads pasted multi-line text from the terminal up to and including
+// the first line that contains end, or until EOF (Ctrl-D). Unlike String it
+// leaves the terminal in line mode, so a long paste isn't redrawn key by key.
+func Lines(end string) (string, error) {
+	var in io.Reader = os.Stdin
+	if tty, err := os.Open("/dev/tty"); err == nil {
+		defer tty.Close()
+		in = tty
+	}
+	r := bufio.NewReader(in)
+	var text strings.Builder
+	for {
+		line, err := r.ReadString('\n')
+		text.WriteString(line)
+		if strings.Contains(line, end) || err == io.EOF {
+			return text.String(), nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
 }
 
 // sanitize strips non-printable and non-ASCII bytes from input.

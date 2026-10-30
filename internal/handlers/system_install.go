@@ -100,7 +100,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 	needsSOCKSPort := false
 	for _, t := range transports {
 		switch t {
-		case config.TransportDNSTT, config.TransportSlipstream, config.TransportVayDNS:
+		case config.TransportDNSTT, config.TransportSlipstream, config.TransportVayDNS, config.TransportSoar:
 			needsDNS = true
 		case config.TransportNaive:
 			needsHTTPS = true
@@ -113,6 +113,9 @@ func handleSystemInstall(ctx *actions.Context) error {
 	if needsDNS {
 		if err := network.AllowPort(53, "udp"); err != nil {
 			out.Warning("Failed to open port 53/udp: " + err.Error())
+		}
+		if err := network.AllowPort(53, "tcp"); err != nil {
+			out.Warning("Failed to open port 53/tcp: " + err.Error())
 		}
 		// Free port 53 from systemd-resolved stub listener
 		if err := network.DisableResolvedStub(); err != nil {
@@ -166,10 +169,11 @@ func handleSystemInstall(ctx *actions.Context) error {
 	var allTunnels []config.TunnelConfig
 	setupSOCKS := false
 
-	// Check if any selected transport needs a backend prompt
+	// Check if any selected transport needs a backend prompt (Soar dials
+	// destinations itself, so it has none)
 	needsBackend := false
 	for _, t := range transports {
-		if t != config.TransportSSH && t != config.TransportSOCKS && t != config.TransportStunTLS {
+		if t != config.TransportSSH && t != config.TransportSOCKS && t != config.TransportStunTLS && t != config.TransportSoar {
 			needsBackend = true
 			break
 		}
@@ -286,6 +290,11 @@ func handleSystemInstall(ctx *actions.Context) error {
 			domainDefault = "v." + knownParent
 		case selectedTransport == config.TransportVayDNS:
 			domainHint = "v.example.com"
+		case selectedTransport == config.TransportSoar && knownParent != "":
+			domainHint = "r." + knownParent
+			domainDefault = "r." + knownParent
+		case selectedTransport == config.TransportSoar:
+			domainHint = "r.example.com"
 		case selectedTransport == config.TransportDNSTT && knownParent != "":
 			domainHint = "t." + knownParent
 			domainDefault = "t." + knownParent
@@ -336,7 +345,30 @@ func handleSystemInstall(ctx *actions.Context) error {
 			}
 		}
 
-			for bIdx, b := range backends {
+		// Soar has its own backends: direct (no login) and/or SSH (per-user logins)
+		soarAllowPorts := ""
+		tunnelBackends := backends
+		if selectedTransport == config.TransportSoar {
+			soarBackend, err := prompt.Select("Backend", actions.SoarBackendOptions)
+			if err != nil {
+				return err
+			}
+			tunnelBackends = []string{soarBackend}
+			if soarBackend == "both" {
+				tunnelBackends = []string{config.BackendDirect, config.BackendSSH}
+			}
+			if tunnelBackends[0] == config.BackendDirect {
+				soarAllowPorts, err = prompt.String(`Allowed destination ports (comma-separated, or "any")`, config.DefaultSoarAllowPorts)
+				if err != nil {
+					return err
+				}
+				if soarAllowPorts == config.DefaultSoarAllowPorts {
+					soarAllowPorts = ""
+				}
+			}
+		}
+
+			for bIdx, b := range tunnelBackends {
 			// NaiveProxy is a single Caddy forward-proxy — one instance on :443
 			// serves both SOCKS and SSH clients (client picks via CONNECT target).
 			// Creating a second tunnel would EADDRINUSE-loop both services.
@@ -345,7 +377,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 			}
 			tag := cfg.UniqueTag(selectedTransport)
 			tunnelDomain := domain
-			if backend == "both" && selectedTransport != config.TransportNaive {
+			if len(tunnelBackends) > 1 && selectedTransport != config.TransportNaive {
 				tag = cfg.UniqueTag(selectedTransport + "-" + b)
 				// SSH backend needs its own subdomain (separate dnstt/slipstream instance)
 				if b == config.BackendSSH {
@@ -355,6 +387,8 @@ func handleSystemInstall(ctx *actions.Context) error {
 						sshHint = "ss." + parentDomain
 					} else if selectedTransport == config.TransportVayDNS {
 						sshHint = "vs." + parentDomain
+					} else if selectedTransport == config.TransportSoar {
+						sshHint = "rs." + parentDomain
 					}
 					sshDomain, err := prompt.String(fmt.Sprintf("Domain for %s", tag), sshHint)
 					if err != nil {
@@ -458,6 +492,20 @@ func handleSystemInstall(ctx *actions.Context) error {
 				}
 				tunnel.Slipstream = &config.SlipstreamConfig{Cert: certPath, Key: keyPath}
 
+			case config.TransportSoar:
+				privKeyPath := filepath.Join(tunnelDir, "server.key")
+				out.Info(fmt.Sprintf("Generating Ed25519 keypair for %s...", tunnelDomain))
+				pubKey, err := keys.GenerateSoarKeys(privKeyPath, filepath.Join(tunnelDir, "server.pub"))
+				if err != nil {
+					return actions.NewError(actions.SystemInstall, "key generation failed", err)
+				}
+				tunnel.Soar = &config.SoarConfig{
+					PrivateKey: privKeyPath,
+					PublicKey:  pubKey,
+					AllowPorts: soarAllowPorts,
+				}
+				out.Success(fmt.Sprintf("Public key: %s", pubKey))
+
 			case config.TransportNaive:
 				if bIdx == 0 {
 					email, err := prompt.String("Email (for Let's Encrypt)", "admin@"+domain)
@@ -544,9 +592,10 @@ func handleSystemInstall(ctx *actions.Context) error {
 	// ── Step 6: Create first user ──────────────────────────────────
 	// Offer user creation when at least one tunnel needs credentials
 	// (domain-based tunnels or direct transports with SSH backend like StunTLS).
+	// Soar authenticates by server key alone.
 	needsUser := false
 	for _, t := range allTunnels {
-		if t.Domain != "" || t.Backend == config.BackendSSH {
+		if (t.Domain != "" && t.Transport != config.TransportSoar) || t.Backend == config.BackendSSH {
 			needsUser = true
 			break
 		}
@@ -701,6 +750,8 @@ func handleSystemInstall(ctx *actions.Context) error {
 		}
 	}
 
+	ensureServerAddress(cfg, out, allTunnels)
+
 	// ── Step 7: Summary ────────────────────────────────────────────
 	out.Print("")
 	out.Print("  ══════════════════════════════════════════════════════")
@@ -754,52 +805,7 @@ func handleSystemInstall(ctx *actions.Context) error {
 	// Show slipnet:// configs
 	out.Print("    Client Configs:")
 	out.Print("")
-	users := cfg.Users
-	if len(users) == 0 {
-		// Show configs without credentials when no user was created
-		users = []config.UserConfig{{}}
-	}
-	for _, u := range users {
-		for _, t := range allTunnels {
-			for _, v := range naiveAwareVariants(&t) {
-				backendCfg := cfg.GetBackend(v.backend)
-				if backendCfg == nil {
-					continue
-				}
-				variantTunnel := t
-				variantTunnel.Backend = v.backend
-				variantTunnel.Tag = v.tag
-
-				modes := []string{""}
-				if t.Transport == config.TransportDNSTT {
-					modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
-				}
-
-				for _, mode := range modes {
-					opts := clientcfg.URIOptions{
-						ClientMode: mode,
-						Username:   u.Username,
-						Password:   u.Password,
-					}
-					uri, err := clientcfg.GenerateURI(&variantTunnel, backendCfg, cfg, opts)
-					if err != nil {
-						continue
-					}
-					label := variantTunnel.Tag
-					if mode == clientcfg.ClientModeNoizDNS {
-						label = strings.ReplaceAll(label, "dnstt", "noizdns")
-					}
-					if u.Username != "" {
-						out.Print(fmt.Sprintf("    [%s] %s", label, u.Username))
-					} else {
-						out.Print(fmt.Sprintf("    [%s] (no auth)", label))
-					}
-					out.Print(fmt.Sprintf("    %s", uri))
-					out.Print("")
-				}
-			}
-		}
-	}
+	printClientConfigs(cfg, out, allTunnels)
 
 	out.Print("  ══════════════════════════════════════════════════════")
 	out.Print("")
@@ -837,48 +843,90 @@ func naiveAwareVariants(t *config.TunnelConfig) []naiveURIVariant {
 	}
 }
 
+// printClientConfigs prints every slipnet:// config of the given tunnels:
+// one per user for tunnels with a login (one without credentials when there
+// are no users), then the login-free Soar configs. It returns how many it
+// printed.
+func printClientConfigs(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) int {
+	ensureServerAddress(cfg, out, tunnels)
+	printed := 0
+	users := cfg.Users
+	if len(users) == 0 {
+		// Show configs without credentials when no user was created
+		users = []config.UserConfig{{}}
+	}
+	for _, u := range users {
+		for _, t := range tunnels {
+			for _, v := range naiveAwareVariants(&t) {
+				backendCfg := cfg.GetBackend(v.backend)
+				if backendCfg == nil {
+					continue
+				}
+				variantTunnel := t
+				variantTunnel.Backend = v.backend
+				variantTunnel.Tag = v.tag
+
+				modes := []string{""}
+				if t.Transport == config.TransportDNSTT {
+					modes = []string{clientcfg.ClientModeDNSTT, clientcfg.ClientModeNoizDNS}
+				}
+
+				for _, mode := range modes {
+					opts := clientcfg.URIOptions{
+						ClientMode: mode,
+						Username:   u.Username,
+						Password:   u.Password,
+					}
+					uri, err := clientcfg.GenerateURI(&variantTunnel, backendCfg, cfg, opts)
+					if err != nil {
+						continue
+					}
+					label := variantTunnel.Tag
+					if mode == clientcfg.ClientModeNoizDNS {
+						label = strings.ReplaceAll(label, "dnstt", "noizdns")
+					}
+					if u.Username != "" {
+						out.Print(fmt.Sprintf("    [%s] %s", label, u.Username))
+					} else {
+						out.Print(fmt.Sprintf("    [%s] (no auth)", label))
+					}
+					out.Print(fmt.Sprintf("    %s", uri))
+					out.Print("")
+					printed++
+				}
+			}
+		}
+	}
+	return printed + printSoarLinks(cfg, out, tunnels)
+}
+
+// printSoarLinks prints, for each direct-backend Soar tunnel, its SlipNet
+// config and the zone and key other Soar clients (e.g. Lantern) need. Those
+// tunnels have no login, so one config serves everyone; Soar+SSH configs
+// carry a user's login and are printed per user like other SSH tunnels.
+// It returns how many configs it printed.
+func printSoarLinks(cfg *config.Config, out actions.OutputWriter, tunnels []config.TunnelConfig) int {
+	printed := 0
+	for i := range tunnels {
+		t := &tunnels[i]
+		if t.Transport != config.TransportSoar || t.Backend != config.BackendDirect || t.Soar == nil {
+			continue
+		}
+		out.Print(fmt.Sprintf("    [%s] (no login)", t.Tag))
+		if uri, err := clientcfg.GenerateURI(t, nil, cfg, clientcfg.URIOptions{}); err == nil {
+			out.Print(fmt.Sprintf("    %s", uri))
+			printed++
+		}
+		out.Print(fmt.Sprintf("    Other Soar clients: zone %s, server key %s", t.Domain, t.Soar.PublicKey))
+		out.Print("")
+	}
+	return printed
+}
+
 // baseDomain extracts the parent domain from a subdomain.
 // e.g. "t.example.com" → "example.com"
 func baseDomain(domain string) string {
-	parts := splitDomain(domain)
-	if len(parts) <= 2 {
-		return domain
-	}
-	return joinDomain(parts[1:])
-}
-
-func splitDomain(d string) []string {
-	var parts []string
-	for _, p := range splitBy(d, '.') {
-		if p != "" {
-			parts = append(parts, p)
-		}
-	}
-	return parts
-}
-
-func splitBy(s string, sep byte) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == sep {
-			parts = append(parts, s[start:i])
-			start = i + 1
-		}
-	}
-	parts = append(parts, s[start:])
-	return parts
-}
-
-func joinDomain(parts []string) string {
-	result := ""
-	for i, p := range parts {
-		if i > 0 {
-			result += "."
-		}
-		result += p
-	}
-	return result
+	return config.ParentDomain(domain)
 }
 
 func copyFile(src, dst string) error {

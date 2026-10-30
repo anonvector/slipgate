@@ -40,7 +40,7 @@ var paddingPool = sync.Pool{
 // The subdomain looks like any other base32-encoded dnstt/noizdns label.
 // The server only responds when the embedded HMAC proof is correct; all
 // other queries (real tunnel traffic, random probes) are forwarded normally.
-func (r *Router) handleVerify(packet []byte, clientAddr *net.UDPAddr) bool {
+func (r *Router) handleVerify(packet []byte, from net.Addr, reply replyFunc) bool {
 	if len(packet) < 12 {
 		return false
 	}
@@ -111,7 +111,7 @@ func (r *Router) handleVerify(packet []byte, clientAddr *net.UDPAddr) bool {
 		return false
 	}
 
-	log.Printf("verify: valid probe from %s, responding", clientAddr)
+	log.Printf("verify: valid probe from %s, responding", from)
 
 	// Valid probe. Compute response: HMAC-SHA256(key, nonce || 0x01)
 	mac2 := hmac.New(sha256.New, vr.pubkey)
@@ -156,9 +156,7 @@ func (r *Router) handleVerify(packet []byte, clientAddr *net.UDPAddr) bool {
 	resp := buildBinaryTXTResponseWithEDNS(packet, qEnd, payload, 4096)
 	paddingPool.Put(bufPtr)
 
-	if _, err := r.conn.WriteToUDP(resp, clientAddr); err != nil {
-		log.Printf("verify: write: %v", err)
-	}
+	reply(resp)
 	return true
 }
 

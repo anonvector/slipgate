@@ -9,8 +9,8 @@ const uriScheme = "slipnet://"
 
 // Encode takes fields and produces a slipnet:// URI.
 // Uses standard base64 (not URL-safe) with no padding wrapping, matching the app.
-func Encode(fields [TotalFields]string) string {
-	payload := strings.Join(fields[:], "|")
+func Encode(fields []string) string {
+	payload := strings.Join(fields, "|")
 	encoded := base64.StdEncoding.EncodeToString([]byte(payload))
 	return uriScheme + encoded
 }

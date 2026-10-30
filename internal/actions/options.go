@@ -7,6 +7,7 @@ var TransportOptions = []SelectOption{
 	{Value: "dnstt", Label: "DNSTT / NoizDNS — DNS tunnel"},
 	{Value: "slipstream", Label: "Slipstream — QUIC DNS tunnel"},
 	{Value: "vaydns", Label: "VayDNS — KCP DNS tunnel"},
+	{Value: "soar", Label: "Soar — multipath DNS tunnel (soar-client compatible)"},
 	{Value: "naive", Label: "NaiveProxy — HTTPS proxy with Caddy"},
 	{Value: "stuntls", Label: "StunTLS — SSH over TLS + WebSocket proxy"},
 	{Value: "external", Label: "External — Route DNS to a custom port"},
@@ -21,6 +22,7 @@ var InstallTransportOptions = []SelectOption{
 	{Value: "dnstt", Label: "DNSTT / NoizDNS — DNS tunnel"},
 	{Value: "slipstream", Label: "Slipstream — QUIC DNS tunnel"},
 	{Value: "vaydns", Label: "VayDNS — KCP DNS tunnel"},
+	{Value: "soar", Label: "Soar — multipath DNS tunnel (soar-client compatible)"},
 	{Value: "naive", Label: "NaiveProxy — HTTPS proxy with Caddy"},
 	{Value: "stuntls", Label: "StunTLS — SSH over TLS + WebSocket proxy"},
 	{Value: "direct-ssh", Label: "SSH — Direct SSH tunnel"},
@@ -31,6 +33,14 @@ var InstallTransportOptions = []SelectOption{
 var ClientModeOptions = []SelectOption{
 	{Value: "dnstt", Label: "DNSTT — Classic DNS tunnel client"},
 	{Value: "noizdns", Label: "NoizDNS — DNS tunnel with DPI evasion"},
+}
+
+// SoarBackendOptions replaces BackendOptions for Soar, which dials
+// destinations itself (direct) or reaches only the SSH backend.
+var SoarBackendOptions = []SelectOption{
+	{Value: "direct", Label: "Direct — no login; server reaches public sites (Lantern-compatible)"},
+	{Value: "ssh", Label: "SSH — per-user logins (SlipNet)"},
+	{Value: "both", Label: "Both — Direct + SSH"},
 }
 
 var BackendOptions = []SelectOption{

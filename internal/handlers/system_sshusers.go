@@ -33,6 +33,7 @@ func handleSystemUsers(ctx *actions.Context) error {
 			{Value: "edit_password", Label: "Edit user password"},
 			{Value: "remove", Label: "Remove user"},
 			{Value: "list", Label: "List users & configs"},
+			{Value: "configs", Label: "Show all configs (every tunnel and user)"},
 		})
 		if err != nil {
 			return err
@@ -40,9 +41,15 @@ func handleSystemUsers(ctx *actions.Context) error {
 	}
 
 	switch action {
+	case "configs":
+		out.Print("")
+		if printClientConfigs(cfg, out, cfg.Tunnels) == 0 {
+			out.Info("No tunnels with SlipNet configs. Run 'slipgate tunnel add' to create one.")
+		}
+
 	case "list":
 		if len(cfg.Users) == 0 {
-			out.Info("No users configured. Run 'slipgate users add' to create one.")
+			out.Info("No users configured. Run 'slipgate users add' to create one, or 'slipgate users configs' for configs that need no login.")
 			return nil
 		}
 
@@ -398,17 +405,20 @@ func nextUsernameIndex(cfg *config.Config, prefix string) int {
 }
 
 func showUserConfigs(cfg *config.Config, username, password string, out actions.OutputWriter) {
+	ensureServerAddress(cfg, out, cfg.Tunnels)
 	for _, t := range cfg.Tunnels {
 		backend := cfg.GetBackend(t.Backend)
 		if backend == nil {
 			continue
 		}
 
-		// Show public key for DNSTT/VayDNS tunnels
+		// Show public key for DNSTT/VayDNS/Soar tunnels
 		if t.Transport == config.TransportDNSTT && t.DNSTT != nil && t.DNSTT.PublicKey != "" {
 			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.DNSTT.PublicKey))
 		} else if t.Transport == config.TransportVayDNS && t.VayDNS != nil && t.VayDNS.PublicKey != "" {
 			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.VayDNS.PublicKey))
+		} else if t.Transport == config.TransportSoar && t.Soar != nil && t.Soar.PublicKey != "" {
+			out.Print(fmt.Sprintf("  [%s] Public Key: %s", t.Tag, t.Soar.PublicKey))
 		}
 
 		modes := []string{""}
