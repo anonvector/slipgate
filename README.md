@@ -410,7 +410,14 @@ make release            # Build release binaries
 
 ## Credits
 
-Built on top of [dnstm](https://github.com/net2share/dnstm) and [vaydns](https://github.com/net2share/vaydns) by [net2share](https://github.com/net2share), and [soar](https://github.com/getlantern/soar) by [Lantern](https://github.com/getlantern). WARP integration inspired by [dnstun-ezpz](https://github.com/aleskxyz/dnstun-ezpz).
+SlipGate builds on these projects:
+
+- [dnstt](https://www.bamsoftware.com/software/dnstt/) by David Fifield - the DNS tunnel behind the DNSTT and NoizDNS transports, via the [tladesignz/dnstt](https://github.com/tladesignz/dnstt) fork (public domain / CC0)
+- [Slipstream](https://github.com/EndPositive/slipstream) by [EndPositive](https://github.com/EndPositive) and its Rust rewrite [slipstream-rust](https://github.com/Mygod/slipstream-rust) by [Mygod](https://github.com/Mygod) - the QUIC-over-DNS tunnel behind the Slipstream transport (Apache-2.0)
+- [VayDNS](https://github.com/net2share/vaydns) by [net2share](https://github.com/net2share) - the KCP-based DNS tunnel behind the VayDNS transport (CC0)
+- [Soar](https://github.com/getlantern/soar) by [Lantern](https://github.com/getlantern) - the multi-resolver DNS tunnel behind the Soar transport, built into slipgate (Apache-2.0)
+- [dnstm](https://github.com/net2share/dnstm) by [net2share](https://github.com/net2share) - the DNS tunnel manager SlipGate was originally built on
+- WARP integration inspired by [dnstun-ezpz](https://github.com/aleskxyz/dnstun-ezpz) by [aleskxyz](https://github.com/aleskxyz)
 
 ## License
 
